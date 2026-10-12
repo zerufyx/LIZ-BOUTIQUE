@@ -121,17 +121,23 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:55;
 .search input{width:100%;padding:11px 16px;border-radius:999px;border:1px solid var(--gold);background:var(--white);font-size:17px}
 .search input::placeholder{color:#A88E86;font-style:italic}
 
-/* categorías: aros dorados como el del logo */
-.cats{max-width:1180px;margin:0 auto;display:flex;gap:14px;overflow-x:auto;padding:6px 16px 12px;scrollbar-width:none;scroll-snap-type:x proximity}
+/* categorías: barra fija con nombres (para cambiar rápido) */
+.cats{max-width:1180px;margin:0 auto;display:flex;gap:8px;overflow-x:auto;padding:4px 16px 12px;scrollbar-width:none;scroll-snap-type:x proximity}
 .cats::-webkit-scrollbar{display:none}
-.cat{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:5px;scroll-snap-align:start;width:66px}
-.cat .disc{width:56px;height:56px;border-radius:50%;display:grid;place-items:center;background:var(--powder);
-  box-shadow:inset 0 0 0 1.5px var(--gold);color:var(--gold-dk);transition:transform .25s,background .25s,color .25s}
-.cat .disc svg{width:28px;height:28px}
-.cat span{font-size:14px;font-weight:600;color:var(--ink-soft);white-space:nowrap;max-width:74px;overflow:hidden;text-overflow:ellipsis}
-.cat[aria-pressed="true"] .disc{background:var(--ink);color:var(--gold-lt);box-shadow:inset 0 0 0 1.5px var(--ink),0 0 0 3px var(--white),0 0 0 4.5px var(--gold)}
-.cat[aria-pressed="true"] span{color:var(--ink)}
-.cat:active .disc{transform:scale(.92)}
+.cat{flex:0 0 auto;scroll-snap-align:start;padding:8px 15px;border-radius:999px;border:1px solid rgba(197,156,104,.6);background:rgba(255,250,248,.7);
+  font:600 12.5px/1.2 var(--caps);letter-spacing:.05em;color:var(--ink-soft);white-space:nowrap;transition:background .2s,color .2s,transform .15s}
+.cat[aria-pressed="true"]{background:var(--ink);color:var(--gold-lt);border-color:var(--ink)}
+.cat:active{transform:scale(.95)}
+
+/* portadas de categoría: se ven completas, en columnas */
+.covers{display:flex;gap:12px;align-items:flex-start}
+.covers .col{flex:1;display:flex;flex-direction:column;gap:12px;min-width:0}
+.cover{display:block;width:100%;border-radius:6px;overflow:hidden;background:var(--powder);box-shadow:0 14px 30px -20px rgba(110,70,50,.55);transition:transform .25s}
+.cover:active{transform:scale(.98)}
+.cover img{display:block;width:100%;height:auto}
+.cover .cover-name{display:grid;place-items:center;aspect-ratio:1;padding:12px;font-family:var(--script);font-size:38px;color:var(--ink);text-align:center}
+.grid-back{display:inline-flex;align-items:center;gap:6px;margin:-4px 2px 12px;font:600 13px var(--caps);letter-spacing:.04em;color:var(--gold-dk)}
+.grid-back[hidden]{display:none}
 
 /* =========================================================
    CONTENIDO
@@ -322,7 +328,7 @@ footer .small{font-size:13px;margin-top:10px;opacity:.8}
 <main id="main">
   <section class="hello">
     <h1 class="foil">Bienvenidos a Liz</h1>
-    <p>Vestidos, zapatos, bolsos y accesorios escogidos uno a uno para toda persona con estilo propio. Elige, arma tu pedido y lo confirmamos por WhatsApp.</p>
+    <p>Ropa de mujer y de hombre, zapatos, bolsos, lentes, gorras y accesorios escogidos uno a uno para toda persona con estilo propio. Elige, arma tu pedido y lo confirmamos por WhatsApp.</p>
   </section>
 
   <section id="newSec" hidden>
@@ -330,8 +336,14 @@ footer .small{font-size:13px;margin-top:10px;opacity:.8}
     <div class="rail" id="rail"></div>
   </section>
 
-  <section>
+  <section id="coverSec" hidden>
+    <h2 class="sec"><span class="foil">Categorías</span><small>toca una portada</small></h2>
+    <div class="covers" id="covers"></div>
+  </section>
+
+  <section id="gridSec">
     <h2 class="sec"><span class="foil" id="gridTitle">Colección</span><small id="gridCount"></small></h2>
+    <button class="grid-back" id="gridBack" data-cat="all" hidden>← Todas las categorías</button>
     <div class="grid" id="grid" aria-live="polite"></div>
   </section>
 </main>
@@ -490,7 +502,7 @@ async function load(){
             if(cc.facebook)CONFIG.facebook=cc.facebook;if(cc.entrega)CONFIG.deliveryNote=cc.entrega}}catch(e){}
       const map={};cats.forEach(c=>map[c.id]=c.name||c.nombre);
       PRODUCTS=rows.map(r=>norm(r,map)).sort((a,b)=>a.order-b.order);
-      CATS=cats.length?cats.map(c=>({id:String(c.id).toLowerCase(),name:c.name||c.nombre}))
+      CATS=cats.length?cats.map(c=>({id:String(c.id).toLowerCase(),name:c.name||c.nombre,img:c.image_url||''}))
         :[...new Map(PRODUCTS.filter(p=>p.catName).map(p=>[p.cat,{id:p.cat,name:p.catName}])).values()];
       return;
     }catch(e){console.warn('Supabase no respondió, usando demo:',e)}
@@ -518,8 +530,17 @@ function card(p){
 }
 function renderCats(){
   const items=[{id:'all',name:'Todo'},...CATS];
-  $('#cats').innerHTML=items.map(c=>`<button class="cat" data-cat="${esc(c.id)}" aria-pressed="${cat===c.id}">
-    <span class="disc">${svg(c.id==='all'?'all':iconFor(c.name))}</span><span>${esc(c.name)}</span></button>`).join('');
+  $('#cats').innerHTML=items.map(c=>`<button class="cat" data-cat="${esc(c.id)}" aria-pressed="${cat===c.id}">${esc(c.name)}</button>`).join('');
+  const on=$('#cats [aria-pressed="true"]');if(on)on.scrollIntoView({block:'nearest',inline:'nearest'});
+}
+/* portadas: repartidas en columnas para que cada una se vea completa y en orden */
+function renderCovers(){
+  const show=CATS.length&&cat==='all'&&!query;
+  $('#coverSec').hidden=!show;if(!show)return;
+  const n=innerWidth>=900?4:innerWidth>=600?3:2, cols=Array.from({length:n},()=>[]);
+  CATS.forEach((c,i)=>cols[i%n].push(`<button class="cover" data-cat="${esc(c.id)}" aria-label="Ver ${esc(c.name)}">${c.img
+    ?`<img src="${esc(c.img)}" alt="${esc(c.name)}" loading="lazy">`:`<span class="cover-name">${esc(c.name)}</span>`}</button>`));
+  $('#covers').innerHTML=cols.map(c=>`<div class="col">${c.join('')}</div>`).join('');
 }
 function filtered(){
   const q=query.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
@@ -529,7 +550,8 @@ function filtered(){
 function renderGrid(){
   const items=filtered();
   const cname=cat==='all'?'Colección':(CATS.find(c=>c.id===cat)||{}).name||'Colección';
-  $('#gridTitle').textContent=cname;
+  $('#gridTitle').textContent=cname;$('#gridBack').hidden=cat==='all';
+  renderCovers();
   $('#gridCount').textContent=items.length?`${items.length} ${items.length===1?'pieza':'piezas'}`:'';
   $('#grid').innerHTML=items.length?items.map(card).join(''):
     `<div class="empty" style="grid-column:1/-1"><b>${!PRODUCTS.length?'Muy pronto':'Nada por aquí'}</b>
@@ -581,7 +603,7 @@ function railReset(){
   // si fue un arrastre, no abrir el producto al soltar
   r.addEventListener('click',e=>{if(RAIL.moved){e.stopPropagation();e.preventDefault();RAIL.moved=false}},true);
   if('IntersectionObserver'in window)new IntersectionObserver(e=>{RAIL.visible=e[0].isIntersecting},{threshold:.2}).observe(r);
-  let rt,rw=innerWidth;addEventListener('resize',()=>{if(innerWidth===rw)return;rw=innerWidth;clearTimeout(rt);rt=setTimeout(()=>{if(!$('#newSec').hidden)renderGrid()},250)});
+  let rt,rw=innerWidth;addEventListener('resize',()=>{if(innerWidth===rw)return;rw=innerWidth;clearTimeout(rt);rt=setTimeout(renderGrid,250)});
 })();
 function renderSkeleton(){$('#grid').innerHTML=Array(6).fill('<div class="card skel"><div class="arch"></div></div>').join('')}
 function badges(){
@@ -701,7 +723,7 @@ document.addEventListener('click',e=>{
   if(t.id==='veil'||t.hasAttribute('data-close'))return hide();
   if(t.dataset.open)return openProduct(t.dataset.open);
   if(t.dataset.cat){cat=t.dataset.cat;renderCats();renderGrid();
-    const g=$('#grid').getBoundingClientRect().top+scrollY-($('header.top').offsetHeight+70);if(scrollY>g)scrollTo({top:g,behavior:'smooth'});return}
+    const g=$('#gridSec').getBoundingClientRect().top+scrollY-($('header.top').offsetHeight+8);scrollTo({top:Math.max(0,g),behavior:'smooth'});return}
   const opt=t.parentElement&&t.parentElement.dataset.opt;
   if(opt){sel[opt]=t.dataset.v;$$(`[data-opt="${opt}"] .chip`).forEach(c=>c.setAttribute('aria-pressed',c===t));return}
   if(t.dataset.q){sel.qty=Math.max(1,Math.min(20,sel.qty+(+t.dataset.q)));$('#pq').textContent=sel.qty;return}

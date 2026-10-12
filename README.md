@@ -7,10 +7,12 @@ Catálogo de moda (vestidos, zapatos, bolsos y accesorios) con carrito y pedido 
 |---|---|
 | `index.html` | Catálogo: categorías, ofertas, novedades, favoritos, carrito y pedido por WhatsApp |
 | `admin.html` | Panel de Liz: productos, fotos, precios, tallas, colores, categorías y ajustes |
+| `portadas/` | Portadas iniciales de las 7 categorías (las nuevas que suba Liz van a Supabase) |
+| `prueba/` | Fotos de los productos de prueba. Se borra cuando Liz borre esos productos |
 
 **Plan:** pago único de $300, sin mensualidad. Liz sube sus fotos y productos desde el panel.
 
-**Supabase:** sistema de Tiendas, `store_id = 6` (slug `liz-boutique`). Tablas `stores`, `categories`, `products` (usa la columna `colors`). Fotos en el bucket `store-products`, carpeta `6/`. Solo se usa la llave pública.
+**Supabase:** sistema de Tiendas, `store_id = 6` (slug `liz-boutique`). Tablas `stores`, `categories` (usa `image_url` para la portada), `products` (usa la columna `colors`). Fotos en el bucket `store-products`, carpeta `6/`. Solo se usa la llave pública.
 
 **WhatsApp, Instagram, Facebook y nota de entrega** se cambian desde el panel (Ajustes). Lo que hay en `CONFIG` dentro de `index.html` solo se usa si el panel no tiene nada guardado.
 

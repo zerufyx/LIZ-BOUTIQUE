@@ -149,7 +149,11 @@ main{max-width:980px;margin:0 auto;padding:18px 16px 110px}
 .chips input{flex:1;min-width:120px;border:0;background:none;outline:none;height:30px;padding:0 6px;font-size:14px}
 
 /* Categorías */
-.cat-row{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--line)}
+.cat-row{display:grid;grid-template-columns:64px 1fr auto;gap:10px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--line)}
+.cov{position:relative;width:64px;height:64px;border-radius:10px;overflow:hidden;border:1px dashed var(--line-strong);background:#fff;display:grid;place-items:center;color:var(--muted)}
+.cov img{width:100%;height:100%;object-fit:contain}
+.cov .ed{position:absolute;inset:auto 0 0 0;font-size:9.5px;font-weight:600;background:rgba(27,20,20,.72);color:#fff;padding:2px 0;text-align:center}
+.cov.loading::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 30%,rgba(197,156,104,.35) 50%,transparent 70%);background-size:300% 100%;animation:sk 1s infinite}
 .cat-row:last-child{border-bottom:0}
 .cat-row .inp{height:40px;background:transparent;border-color:transparent}
 .cat-row .inp:hover{border-color:var(--line)}
@@ -166,6 +170,12 @@ main{max-width:980px;margin:0 auto;padding:18px 16px 110px}
 
 @media (max-width:640px){
   .top .tag{display:none}
+  .cat-row{grid-template-columns:52px 1fr auto;gap:8px;padding:10px}
+  .cat-row .cov{width:52px;height:52px}
+  .cat-row .acts{gap:4px}
+  .cat-row .ibtn{width:34px;height:34px}
+  .cat-row .inp{padding:0 8px}
+  .cat-row .cnt{margin-left:8px}
   .top .word{font-size:24px}
   .row{grid-template-columns:52px 1fr;grid-template-areas:"th meta" "acts acts";row-gap:10px}
   .row .th{grid-area:th;width:52px;height:52px}
@@ -238,7 +248,8 @@ main{max-width:980px;margin:0 auto;padding:18px 16px 110px}
         <input class="inp" id="newCat" placeholder="Nueva categoría" required>
         <button class="btn btn-blue" type="submit">Agregar</button>
       </form>
-      <p class="hint" style="margin-top:12px">Toca un nombre para cambiarlo. Las flechas cambian el orden en el catálogo. Solo puedes borrar categorías vacías.</p>
+      <p class="hint" style="margin-top:12px">Toca la foto para poner o cambiar la portada (sale completa en el catálogo). Toca un nombre para cambiarlo. Las flechas cambian el orden. Solo puedes borrar categorías vacías.</p>
+      <input type="file" id="coverFile" accept="image/*" hidden>
     </div>
 
     <!-- Ajustes -->
@@ -554,6 +565,7 @@ function renderCats(){
   $("#nCat").textContent=CATS.length;
   if(!CATS.length){ $("#cList").innerHTML='<div class="empty"><strong>Sin categorías</strong>Agrega la primera abajo.</div>'; return; }
   $("#cList").innerHTML=CATS.map((c,i)=>{ const n=PRODS.filter(p=>p.category_id===c.id).length; return `<div class="cat-row">
+    <button class="cov" type="button" data-cover="${c.id}" aria-label="Portada de ${esc(c.name)}">${c.image_url?`<img src="${esc(c.image_url)}" alt="">`:ic("img",1.5)}<span class="ed">${c.image_url?"Cambiar":"Portada"}</span></button>
     <div><input class="inp" value="${esc(c.name)}" data-rename="${c.id}" aria-label="Nombre de categoría"><span class="cnt">${n} ${n===1?"producto":"productos"}</span></div>
     <div class="acts">
       <button class="ibtn" data-move="-1" data-i="${i}" ${i===0?"disabled":""} aria-label="Subir">${ic("up",2)}</button>
@@ -569,8 +581,21 @@ $("#cList").addEventListener("change",async e=>{
   catch(err){ t.value=c.name; toast(err.message,true); }
 });
 $("#cList").addEventListener("keydown",e=>{ if(e.key==="Enter"&&e.target.matches("[data-rename]")) e.target.blur(); });
+let coverFor=null;
+$("#coverFile").addEventListener("change",async e=>{
+  const f=e.target.files[0]; e.target.value=""; const c=CATS.find(x=>x.id===coverFor); if(!f||!c) return;
+  const btn=document.querySelector(`[data-cover="${c.id}"]`); if(btn) btn.classList.add("loading");
+  try{
+    const b=await compress(f,1200,.82);
+    const url=await upload(b,`portada-${c.id}-${Date.now()}.webp`);
+    await api(`categories?id=eq.${c.id}`,{method:"PATCH",body:{image_url:url}});
+    if(c.image_url) removeFile(c.image_url);
+    c.image_url=url; renderCats(); toast("Portada actualizada");
+  }catch(err){ toast(err.message,true); if(btn) btn.classList.remove("loading"); }
+});
 $("#cList").addEventListener("click",async e=>{
   const t=e.target.closest("button"); if(!t||t.disabled) return;
+  if(t.dataset.cover){ coverFor=+t.dataset.cover; return $("#coverFile").click(); }
   if(t.dataset.move){
     const i=+t.dataset.i, j=i+ +t.dataset.move; [CATS[i],CATS[j]]=[CATS[j],CATS[i]];
     CATS.forEach((c,k)=>c.position=k+1); renderCats();
@@ -584,7 +609,7 @@ $("#cList").addEventListener("click",async e=>{
 });
 $("#addCat").addEventListener("submit",async e=>{
   e.preventDefault(); const v=$("#newCat").value.trim(); if(!v) return;
-  try{ await api("categories",{method:"POST",body:{store_id:STORE.id,name:v,position:CATS.length+1},prefer:"return=minimal"}); $("#newCat").value=""; await loadCats(); toast("Categoría agregada"); }
+  try{ await api("categories",{method:"POST",body:{store_id:STORE.id,name:v,position:CATS.length+1},prefer:"return=minimal"}); $("#newCat").value=""; await loadCats(); toast("Categoría agregada. Toca la foto para ponerle portada."); }
   catch(err){ toast(err.message,true); }
 });
 
