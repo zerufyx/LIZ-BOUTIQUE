@@ -676,7 +676,8 @@ function checkout(){
   readBuyer();
   if(!buyer.name.trim()){toast('Escribe tu nombre');$('#bn').focus();return}
   const total=cart.reduce((a,i)=>a+i.qty*i.price,0);
-  const lines=cart.map((i,k)=>`${k+1}. ${i.name}${i.size?` · Talla ${i.size}`:''}${i.color?` · ${i.color}`:''}\n   ${i.price>0?`${i.qty} x ${money(i.price)} = ${money(i.qty*i.price)}`:`${i.qty} x precio a confirmar`}`).join('\n');
+  const plink=id=>{const u=new URL(location.origin+location.pathname);u.searchParams.set('p',id);return u.href};
+  const lines=cart.map((i,k)=>`${k+1}. ${i.name}${i.size?` · Talla ${i.size}`:''}${i.color?` · ${i.color}`:''}\n   ${i.price>0?`${i.qty} x ${money(i.price)} = ${money(i.qty*i.price)}`:`${i.qty} x precio a confirmar`}\n   Ver: ${plink(i.id)}`).join('\n\n');
   wa(`Hola Liz Boutique 👑 quiero hacer este pedido:\n\n${lines}\n\nTotal: ${money(total)}${cart.some(i=>!(i.price>0))?' + precios por confirmar':''}\n\nNombre: ${buyer.name}\nEntrega: ${buyer.delivery}${buyer.delivery!=='Recoger'&&buyer.address?`\nDirección: ${buyer.address}`:''}${buyer.notes?`\nNotas: ${buyer.notes}`:''}`);
 }
 function readBuyer(){const n=$('#bn'),a=$('#ba'),o=$('#bo');if(n)buyer.name=n.value;if(a)buyer.address=a.value;if(o)buyer.notes=o.value;store.set('buyer',buyer)}
