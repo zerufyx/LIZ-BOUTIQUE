@@ -150,9 +150,8 @@ h2.sec::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(
 .rail{display:flex;gap:14px;overflow-x:auto;scroll-snap-type:x mandatory;padding:4px 2px 12px;scrollbar-width:none}
 .rail::-webkit-scrollbar{display:none}
 .rail .card{flex:0 0 min(58%,240px);scroll-snap-align:start}
-.rail-dots{display:flex;justify-content:center;gap:6px;margin:2px 0 6px}
-.rail-dots i{width:6px;height:6px;border-radius:999px;background:var(--rose);opacity:.55;transition:width .35s,opacity .35s,background .35s}
-.rail-dots i.on{width:18px;opacity:1;background:var(--gold)}
+.rail.loop{scroll-snap-type:none;-webkit-mask-image:linear-gradient(90deg,transparent,#000 4%,#000 96%,transparent);mask-image:linear-gradient(90deg,transparent,#000 4%,#000 96%,transparent)}
+.rail.loop .card{scroll-snap-align:none}
 
 /* grilla con marcos en arco (espejo de boutique) */
 .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 14px}
@@ -335,7 +334,6 @@ footer .small{font-size:13px;margin-top:10px;opacity:.8}
   <section id="newSec" hidden>
     <h2 class="sec"><span class="foil">Lo nuevo</span><small>recién llegado</small></h2>
     <div class="rail" id="rail"></div>
-    <div class="rail-dots" id="railDots" aria-hidden="true"></div>
   </section>
 
   <section>
@@ -551,36 +549,43 @@ function renderGrid(){
   railReset();
 }
 /* =========================================================
-   VITRINA "LO NUEVO": avanza sola como banner; se pausa si la clienta la toca
+   VITRINA "LO NUEVO": banner continuo que se desliza solo.
+   Se duplican las piezas para que el giro no tenga cortes.
+   Si la clienta lo toca o lo desliza, se detiene un momento y sigue.
    ========================================================= */
-const RAIL={timer:null,pauseUntil:0,visible:true,every:3200};
-function railCards(){return $$('#rail .card')}
-function railIndex(){const r=$('#rail'),cs=railCards();if(!cs.length)return 0;
-  let best=0,d=1e9;cs.forEach((c,i)=>{const x=Math.abs(c.offsetLeft-r.offsetLeft-r.scrollLeft);if(x<d){d=x;best=i}});return best}
-function railDots(){const n=railCards().length,box=$('#railDots');if(!box)return;
-  const r=$('#rail');const fits=r.scrollWidth<=r.clientWidth+4;
-  box.innerHTML=n>1&&!fits?Array.from({length:n},(_,i)=>`<i class="${i===railIndex()?'on':''}"></i>`).join(''):''}
-function railStep(){
-  const r=$('#rail'),cs=railCards();
-  if(!cs.length||$('#newSec').hidden||!RAIL.visible||document.hidden||openEl||Date.now()<RAIL.pauseUntil)return;
-  if(r.scrollWidth<=r.clientWidth+4)return;
-  const atEnd=r.scrollLeft+r.clientWidth>=r.scrollWidth-6;
-  const next=atEnd?0:Math.min(cs.length-1,railIndex()+1);
-  r.scrollTo({left:cs[next].offsetLeft-r.offsetLeft,behavior:'smooth'});
+const RAIL={raf:0,pos:0,last:0,set:0,pauseUntil:0,visible:true,speed:32}; // px por segundo
+function railLoop(t){
+  RAIL.raf=requestAnimationFrame(railLoop);
+  const r=$('#rail'),dt=RAIL.last?Math.min(64,t-RAIL.last):16;RAIL.last=t;
+  if(!RAIL.set||$('#newSec').hidden||!RAIL.visible||document.hidden||openEl)return;
+  if(Date.now()<RAIL.pauseUntil){RAIL.pos=r.scrollLeft;return}
+  RAIL.pos+=RAIL.speed*dt/1000;
+  if(RAIL.pos>=RAIL.set)RAIL.pos-=RAIL.set;
+  r.scrollLeft=RAIL.pos;
 }
 function railReset(){
-  const r=$('#rail');r.scrollLeft=0;railDots();
-  clearInterval(RAIL.timer);
+  const r=$('#rail');cancelAnimationFrame(RAIL.raf);RAIL.raf=0;RAIL.set=0;RAIL.pos=0;RAIL.last=0;r.scrollLeft=0;
+  r.classList.remove('loop');
+  const orig=[...r.children];if(orig.length<2)return;
   if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
-  RAIL.timer=setInterval(railStep,RAIL.every);
+  r.classList.add('loop');
+  const html=r.innerHTML;
+  const gap=parseFloat(getComputedStyle(r).columnGap)||14;
+  const set=orig[orig.length-1].offsetLeft+orig[orig.length-1].offsetWidth+gap-orig[0].offsetLeft;
+  const copies=Math.ceil(r.clientWidth/set)+1;
+  r.insertAdjacentHTML('beforeend',Array(copies).fill(html).join(''));
+  [...r.children].slice(orig.length).forEach(c=>{c.setAttribute('aria-hidden','true');c.querySelectorAll('button,a').forEach(x=>x.tabIndex=-1)});
+  RAIL.set=set;
+  RAIL.raf=requestAnimationFrame(railLoop);
 }
 (function railInit(){
   const r=$('#rail');
-  const pause=()=>{RAIL.pauseUntil=Date.now()+7000};
-  ['pointerdown','touchstart','wheel'].forEach(ev=>r.addEventListener(ev,pause,{passive:true}));
-  let st;r.addEventListener('scroll',()=>{clearTimeout(st);st=setTimeout(railDots,80)},{passive:true});
-  if('IntersectionObserver'in window)new IntersectionObserver(e=>{RAIL.visible=e[0].isIntersecting},{threshold:.3}).observe(r);
-  addEventListener('resize',railDots);
+  const pause=()=>{RAIL.pauseUntil=Date.now()+3500};
+  ['pointerdown','touchstart','touchmove','wheel'].forEach(ev=>r.addEventListener(ev,pause,{passive:true}));
+  // si la clienta desliza más allá de una vuelta, se acomoda sin que se note
+  r.addEventListener('scroll',()=>{if(RAIL.set&&Date.now()<RAIL.pauseUntil){if(r.scrollLeft>=RAIL.set*2)r.scrollLeft-=RAIL.set}},{passive:true});
+  if('IntersectionObserver'in window)new IntersectionObserver(e=>{RAIL.visible=e[0].isIntersecting},{threshold:.2}).observe(r);
+  let rt,rw=innerWidth;addEventListener('resize',()=>{if(innerWidth===rw)return;rw=innerWidth;clearTimeout(rt);rt=setTimeout(()=>{if(!$('#newSec').hidden)renderGrid()},250)});
 })();
 function renderSkeleton(){$('#grid').innerHTML=Array(6).fill('<div class="card skel"><div class="arch"></div></div>').join('')}
 function badges(){
