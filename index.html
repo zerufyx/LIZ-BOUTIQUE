@@ -150,8 +150,11 @@ h2.sec::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(
 .rail{display:flex;gap:14px;overflow-x:auto;scroll-snap-type:x mandatory;padding:4px 2px 12px;scrollbar-width:none}
 .rail::-webkit-scrollbar{display:none}
 .rail .card{flex:0 0 min(58%,240px);scroll-snap-align:start}
-.rail.loop{scroll-snap-type:none;-webkit-mask-image:linear-gradient(90deg,transparent,#000 4%,#000 96%,transparent);mask-image:linear-gradient(90deg,transparent,#000 4%,#000 96%,transparent)}
-.rail.loop .card{scroll-snap-align:none}
+.rail.loop{display:block;overflow:hidden;scroll-snap-type:none;touch-action:pan-y;
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 4%,#000 96%,transparent);mask-image:linear-gradient(90deg,transparent,#000 4%,#000 96%,transparent)}
+.rail-track{display:flex;gap:14px;width:max-content;will-change:transform;backface-visibility:hidden}
+.rail.loop .card{flex:0 0 min(calc((min(100vw,1180px) - 36px) * .58),240px);scroll-snap-align:none;-webkit-user-drag:none;user-select:none}
+.rail.loop img{-webkit-user-drag:none;pointer-events:none}
 
 /* grilla con marcos en arco (espejo de boutique) */
 .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 14px}
@@ -549,41 +552,46 @@ function renderGrid(){
   railReset();
 }
 /* =========================================================
-   VITRINA "LO NUEVO": banner continuo que se desliza solo.
-   Se duplican las piezas para que el giro no tenga cortes.
-   Si la clienta lo toca o lo desliza, se detiene un momento y sigue.
+   VITRINA "LO NUEVO": banner continuo (se mueve con transform, fluido en
+   iPhone y Android). Las piezas se duplican para que no haya cortes.
+   Se puede arrastrar con el dedo; al soltar, sigue solo.
    ========================================================= */
-const RAIL={raf:0,pos:0,last:0,set:0,pauseUntil:0,visible:true,speed:32}; // px por segundo
+const RAIL={raf:0,off:0,last:0,set:0,track:null,drag:null,moved:false,pauseUntil:0,visible:true,speed:34}; // px por segundo
+function railPaint(){RAIL.track.style.transform=`translate3d(${-RAIL.off}px,0,0)`}
+function railWrap(){if(RAIL.set){RAIL.off%=RAIL.set;if(RAIL.off<0)RAIL.off+=RAIL.set}}
 function railLoop(t){
   RAIL.raf=requestAnimationFrame(railLoop);
-  const r=$('#rail'),dt=RAIL.last?Math.min(64,t-RAIL.last):16;RAIL.last=t;
-  if(!RAIL.set||$('#newSec').hidden||!RAIL.visible||document.hidden||openEl)return;
-  if(Date.now()<RAIL.pauseUntil){RAIL.pos=r.scrollLeft;return}
-  RAIL.pos+=RAIL.speed*dt/1000;
-  if(RAIL.pos>=RAIL.set)RAIL.pos-=RAIL.set;
-  r.scrollLeft=RAIL.pos;
+  const dt=RAIL.last?Math.min(64,t-RAIL.last):16;RAIL.last=t;
+  if(!RAIL.set||RAIL.drag||$('#newSec').hidden||!RAIL.visible||document.hidden||openEl||Date.now()<RAIL.pauseUntil)return;
+  RAIL.off+=RAIL.speed*dt/1000;railWrap();railPaint();
 }
 function railReset(){
-  const r=$('#rail');cancelAnimationFrame(RAIL.raf);RAIL.raf=0;RAIL.set=0;RAIL.pos=0;RAIL.last=0;r.scrollLeft=0;
+  const r=$('#rail');cancelAnimationFrame(RAIL.raf);Object.assign(RAIL,{raf:0,off:0,last:0,set:0,track:null,drag:null});
   r.classList.remove('loop');
-  const orig=[...r.children];if(orig.length<2)return;
-  if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
-  r.classList.add('loop');
+  const n=r.children.length;
+  if(n<2||matchMedia('(prefers-reduced-motion: reduce)').matches)return; // sin animación: queda el deslizado normal
   const html=r.innerHTML;
-  const gap=parseFloat(getComputedStyle(r).columnGap)||14;
-  const set=orig[orig.length-1].offsetLeft+orig[orig.length-1].offsetWidth+gap-orig[0].offsetLeft;
+  r.classList.add('loop');
+  r.innerHTML=`<div class="rail-track">${html}</div>`;
+  const tr=r.firstElementChild,cs=tr.children;
+  const gap=parseFloat(getComputedStyle(tr).columnGap)||14;
+  const set=cs[n-1].offsetLeft+cs[n-1].offsetWidth+gap-cs[0].offsetLeft;
   const copies=Math.ceil(r.clientWidth/set)+1;
-  r.insertAdjacentHTML('beforeend',Array(copies).fill(html).join(''));
-  [...r.children].slice(orig.length).forEach(c=>{c.setAttribute('aria-hidden','true');c.querySelectorAll('button,a').forEach(x=>x.tabIndex=-1)});
-  RAIL.set=set;
+  tr.insertAdjacentHTML('beforeend',Array(copies).fill(html).join(''));
+  [...tr.children].slice(n).forEach(c=>{c.setAttribute('aria-hidden','true');c.querySelectorAll('button,a').forEach(x=>x.tabIndex=-1)});
+  RAIL.track=tr;RAIL.set=set;railPaint();
   RAIL.raf=requestAnimationFrame(railLoop);
 }
 (function railInit(){
   const r=$('#rail');
-  const pause=()=>{RAIL.pauseUntil=Date.now()+3500};
-  ['pointerdown','touchstart','touchmove','wheel'].forEach(ev=>r.addEventListener(ev,pause,{passive:true}));
-  // si la clienta desliza más allá de una vuelta, se acomoda sin que se note
-  r.addEventListener('scroll',()=>{if(RAIL.set&&Date.now()<RAIL.pauseUntil){if(r.scrollLeft>=RAIL.set*2)r.scrollLeft-=RAIL.set}},{passive:true});
+  r.addEventListener('pointerdown',e=>{if(!RAIL.set)return;RAIL.drag={x:e.clientX,y:e.clientY,off:RAIL.off};RAIL.moved=false});
+  addEventListener('pointermove',e=>{const d=RAIL.drag;if(!d)return;const dx=e.clientX-d.x;
+    if(!RAIL.moved&&Math.abs(dx)>6)RAIL.moved=true;
+    if(RAIL.moved){RAIL.off=d.off-dx;railWrap();railPaint()}},{passive:true});
+  const end=()=>{if(!RAIL.drag)return;RAIL.drag=null;RAIL.last=0;RAIL.pauseUntil=Date.now()+(RAIL.moved?1800:0)};
+  addEventListener('pointerup',end);addEventListener('pointercancel',end);
+  // si fue un arrastre, no abrir el producto al soltar
+  r.addEventListener('click',e=>{if(RAIL.moved){e.stopPropagation();e.preventDefault();RAIL.moved=false}},true);
   if('IntersectionObserver'in window)new IntersectionObserver(e=>{RAIL.visible=e[0].isIntersecting},{threshold:.2}).observe(r);
   let rt,rw=innerWidth;addEventListener('resize',()=>{if(innerWidth===rw)return;rw=innerWidth;clearTimeout(rt);rt=setTimeout(()=>{if(!$('#newSec').hidden)renderGrid()},250)});
 })();
