@@ -454,6 +454,8 @@ let favs=new Set(store.get('favs',[]));
 let cart=store.get('cart',[]);
 let buyer=store.get('buyer',{name:'',delivery:'Entrega local',address:'',notes:''});
 const money=n=>new Intl.NumberFormat(CONFIG.locale,{style:'currency',currency:CONFIG.currency}).format(+n||0);
+/* precio en 0 = se consulta por WhatsApp */
+const pmoney=n=>+n>0?money(n):'Precio a consultar';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const list=v=>Array.isArray(v)?v.filter(Boolean):(typeof v==='string'&&v.trim()?(v.trim().startsWith('[')?(()=>{try{return JSON.parse(v)}catch(e){return[]}})():v.split(',').map(x=>x.trim()).filter(Boolean)):[]);
 
@@ -518,7 +520,7 @@ function card(p){
     <button class="card-hit" data-open="${p.id}" style="display:block;width:100%;text-align:left" aria-label="Ver ${esc(p.name)}">
       <div class="arch">${media(p)}${tag}</div>
       <div class="meta"><div class="name">${esc(p.name)}</div>
-        <div class="price">${money(p.price)}${p.old>p.price?`<s>${money(p.old)}</s>`:''}</div></div>
+        <div class="price">${pmoney(p.price)}${p.old>p.price&&p.price>0?`<s>${money(p.old)}</s>`:''}</div></div>
     </button></article>`;
 }
 function renderCats(){
@@ -566,7 +568,7 @@ function openProduct(id,push=true){
       ${n>1?`<div class="dots" id="dots">${Array.from({length:n},(_,i)=>`<i class="${i?'':'on'}"></i>`).join('')}</div>`:''}</div>
     <div class="p-info">
       <h3 id="pName">${esc(p.name)}</h3>
-      <div class="pp">${money(p.price)}${p.old>p.price?`<s>${money(p.old)}</s>`:''}</div>
+      <div class="pp">${pmoney(p.price)}${p.old>p.price&&p.price>0?`<s>${money(p.old)}</s>`:''}</div>
       ${p.desc?`<p class="desc">${esc(p.desc)}</p>`:''}
       ${p.sizes.length?`<div class="opt"><label class="t">Talla</label><div class="chips" data-opt="size">${p.sizes.map(s=>`<button class="chip" aria-pressed="${sel.size===s}" data-v="${esc(s)}">${esc(s)}</button>`).join('')}</div></div>`:''}
       ${p.colors.length?`<div class="opt"><label class="t">Color</label><div class="chips" data-opt="color">${p.colors.map(s=>`<button class="chip" aria-pressed="${sel.color===s}" data-v="${esc(s)}">${esc(s)}</button>`).join('')}</div></div>`:''}
@@ -598,7 +600,7 @@ function addToCart(){
 function nudge(opt,msg){toast(msg);const el=$(`[data-opt="${opt}"]`);if(el){el.animate([{transform:'translateX(0)'},{transform:'translateX(-6px)'},{transform:'translateX(6px)'},{transform:'translateX(0)'}],{duration:320});el.scrollIntoView({block:'center',behavior:'smooth'})}}
 async function share(p){
   const u=new URL(location.origin+location.pathname);u.searchParams.set('p',p.id);
-  const data={title:p.name+' · Liz Boutique',text:`${p.name} — ${money(p.price)}`,url:u.href};
+  const data={title:p.name+' · Liz Boutique',text:`${p.name} — ${pmoney(p.price)}`,url:u.href};
   try{if(navigator.share){await navigator.share(data);return}}catch(e){if(e.name==='AbortError')return}
   try{await navigator.clipboard.writeText(u.href);toast('Enlace copiado')}catch(e){prompt('Copia el enlace:',u.href)}
 }
@@ -622,8 +624,8 @@ function renderCart(){
       <div class="th">${i.img?`<img src="${esc(i.img)}" alt="">`:`<div class="ph" style="--t:${TINTS[(+i.id||1)%TINTS.length]}">${svg(iconFor(i.cat),1.4)}</div>`}</div>
       <div><b>${esc(i.name)}</b><small>${[i.size&&'Talla '+esc(i.size),i.color&&esc(i.color)].filter(Boolean).join(', ')}</small>
         <div class="qty"><button data-cq="${k}" data-d="-1" aria-label="Menos">−</button><output>${i.qty}</output><button data-cq="${k}" data-d="1" aria-label="Más">+</button></div></div>
-      <div><div class="lp">${money(i.qty*i.price)}</div><button class="rm" data-rm="${k}">Quitar</button></div></div>`).join('')}
-    <div class="total"><span>Total</span><span>${money(total)}</span></div>
+      <div><div class="lp">${i.price>0?money(i.qty*i.price):'A confirmar'}</div><button class="rm" data-rm="${k}">Quitar</button></div></div>`).join('')}
+    <div class="total"><span>Total</span><span>${money(total)}${cart.some(i=>!(i.price>0))?'<small style="display:block;font:italic 13px var(--serif);text-align:right">+ precios por confirmar</small>':''}</span></div>
     <div class="fields">
       <label class="sr" for="bn">Tu nombre</label><input id="bn" placeholder="Tu nombre" value="${esc(buyer.name)}" autocomplete="name">
       <div class="seg" role="group" aria-label="Forma de entrega">${['Entrega local','Envío','Recoger'].map(o=>`<button class="chip" data-dl="${o}" aria-pressed="${buyer.delivery===o}">${o}</button>`).join('')}</div>
@@ -637,8 +639,8 @@ function checkout(){
   readBuyer();
   if(!buyer.name.trim()){toast('Escribe tu nombre');$('#bn').focus();return}
   const total=cart.reduce((a,i)=>a+i.qty*i.price,0);
-  const lines=cart.map((i,k)=>`${k+1}. ${i.name}${i.size?` · Talla ${i.size}`:''}${i.color?` · ${i.color}`:''}\n   ${i.qty} x ${money(i.price)} = ${money(i.qty*i.price)}`).join('\n');
-  wa(`Hola Liz Boutique 👑 quiero hacer este pedido:\n\n${lines}\n\nTotal: ${money(total)}\n\nNombre: ${buyer.name}\nEntrega: ${buyer.delivery}${buyer.delivery!=='Recoger'&&buyer.address?`\nDirección: ${buyer.address}`:''}${buyer.notes?`\nNotas: ${buyer.notes}`:''}`);
+  const lines=cart.map((i,k)=>`${k+1}. ${i.name}${i.size?` · Talla ${i.size}`:''}${i.color?` · ${i.color}`:''}\n   ${i.price>0?`${i.qty} x ${money(i.price)} = ${money(i.qty*i.price)}`:`${i.qty} x precio a confirmar`}`).join('\n');
+  wa(`Hola Liz Boutique 👑 quiero hacer este pedido:\n\n${lines}\n\nTotal: ${money(total)}${cart.some(i=>!(i.price>0))?' + precios por confirmar':''}\n\nNombre: ${buyer.name}\nEntrega: ${buyer.delivery}${buyer.delivery!=='Recoger'&&buyer.address?`\nDirección: ${buyer.address}`:''}${buyer.notes?`\nNotas: ${buyer.notes}`:''}`);
 }
 function readBuyer(){const n=$('#bn'),a=$('#ba'),o=$('#bo');if(n)buyer.name=n.value;if(a)buyer.address=a.value;if(o)buyer.notes=o.value;store.set('buyer',buyer)}
 
@@ -670,7 +672,7 @@ document.addEventListener('click',e=>{
   if(t.dataset.q){sel.qty=Math.max(1,Math.min(20,sel.qty+(+t.dataset.q)));$('#pq').textContent=sel.qty;return}
   if(t.id==='addBtn')return addToCart();
   if(t.id==='shareBtn')return share(cur);
-  if(t.id==='askBtn'){const u=new URL(location.origin+location.pathname);u.searchParams.set('p',cur.id);return wa(`Hola Liz Boutique 👑 me interesa: ${cur.name} (${money(cur.price)}). ¿Está disponible?\n${u.href}`)}
+  if(t.id==='askBtn'){const u=new URL(location.origin+location.pathname);u.searchParams.set('p',cur.id);return wa(`Hola Liz Boutique 👑 me interesa: ${cur.name}${cur.price>0?` (${money(cur.price)})`:''}. ¿Está disponible?\n${u.href}`)}
   if(t.dataset.cq){const i=cart[+t.dataset.cq];i.qty+=+t.dataset.d;if(i.qty<1)cart.splice(+t.dataset.cq,1);readBuyer();saveCart();return renderCart()}
   if(t.dataset.rm){cart.splice(+t.dataset.rm,1);readBuyer();saveCart();return renderCart()}
   if(t.dataset.dl){readBuyer();buyer.delivery=t.dataset.dl;store.set('buyer',buyer);return renderCart()}
