@@ -1,11 +1,11 @@
 # Liz Boutique — cliente
 
-Catálogo de moda (vestidos, zapatos, bolsos y accesorios) con carrito y pedido por WhatsApp. **Cliente** de Zerufy Studio.
+Catálogo de moda (ropa de mujer y hombre, zapatos, bolsos, lentes, gorras y accesorios) con carrito y pedido por WhatsApp. **Cliente** de Zerufy Studio.
 **En línea:** https://zerufyx.github.io/LIZ-BOUTIQUE/ (dominio propio pendiente)
 
 | Archivo | Qué es |
 |---|---|
-| `index.html` | Catálogo: categorías, ofertas, novedades, favoritos, carrito y pedido por WhatsApp |
+| `index.html` | Catálogo: portadas por categoría, banner de lo nuevo, ofertas, carrito y pedido por WhatsApp (con link de cada producto) |
 | `admin.html` | Panel de Liz: productos, fotos, precios, tallas, colores, categorías y ajustes |
 | `portadas/` | Portadas iniciales de las 7 categorías (las nuevas que suba Liz van a Supabase) |
 | `prueba/` | Fotos de los productos de prueba. Se borra cuando Liz borre esos productos |
