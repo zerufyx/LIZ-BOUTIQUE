@@ -172,12 +172,6 @@ h2.sec::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(
   font:600 11px/1.6 var(--caps);letter-spacing:.08em;background:var(--ink);color:var(--gold-lt);white-space:nowrap}
 .tag.sale{background:var(--white);color:var(--ink);box-shadow:inset 0 0 0 1px var(--gold)}
 .tag.out{background:rgba(27,20,20,.65);color:#fff}
-.fav{position:absolute;top:10%;right:8px;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;
-  background:rgba(255,250,248,.85);color:var(--ink);z-index:2;transition:transform .2s}
-.fav svg{width:18px;height:18px}
-.fav.on{color:#B3394B}
-.fav.on svg path{fill:currentColor}
-.fav:active{transform:scale(.85)}
 .card .meta{padding:10px 4px 0}
 .card .name{font-size:18px;font-weight:600;line-height:1.2;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .card .price{margin-top:3px;font:600 15px/1.3 var(--caps);letter-spacing:.03em;color:var(--gold-dk)}
@@ -316,9 +310,6 @@ footer .small{font-size:13px;margin-top:10px;opacity:.8}
     <a class="brand" href="./" aria-label="Liz Boutique, inicio"><img data-logo-icon alt=""><b>Liz boutique</b></a>
     <button class="icon-btn" id="bSearch" aria-label="Buscar" aria-expanded="false">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg></button>
-    <button class="icon-btn" id="bFavs" aria-label="Ver favoritos" aria-pressed="false">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20s-7.5-4.4-7.5-10A4.3 4.3 0 0112 7.3 4.3 4.3 0 0119.5 10c0 5.6-7.5 10-7.5 10z"/></svg>
-      <span class="badge" id="favCount">0</span></button>
     <button class="icon-btn" id="bCart" aria-label="Abrir carrito">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M5 8h14l-1.3 12H6.3z"/><path d="M9 8V6.5a3 3 0 016 0V8"/></svg>
       <span class="badge" id="cartCount">0</span></button>
@@ -453,8 +444,7 @@ const DEMO=[
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const store={get(k,d){try{const v=localStorage.getItem('liz_'+k);return v?JSON.parse(v):d}catch(e){return d}},
              set(k,v){try{localStorage.setItem('liz_'+k,JSON.stringify(v))}catch(e){}}};
-let PRODUCTS=[],CATS=[],cat='all',query='',favOnly=false;
-let favs=new Set(store.get('favs',[]));
+let PRODUCTS=[],CATS=[],cat='all',query='';
 let cart=store.get('cart',[]);
 let buyer=store.get('buyer',{name:'',delivery:'Entrega local',address:'',notes:''});
 const money=n=>new Intl.NumberFormat(CONFIG.locale,{style:'currency',currency:CONFIG.currency}).format(+n||0);
@@ -519,8 +509,6 @@ function media(p,i=0){
 function card(p){
   const tag=p.out?'<span class="tag out">Agotado</span>':p.old>p.price?'<span class="tag sale">Oferta</span>':p.isNew?'<span class="tag">Nuevo</span>':'';
   return`<article class="card${p.out?' soldout':''}">
-    <button class="fav${favs.has(String(p.id))?' on':''}" data-fav="${p.id}" aria-label="Guardar ${esc(p.name)} en favoritos" aria-pressed="${favs.has(String(p.id))}">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20s-7.5-4.4-7.5-10A4.3 4.3 0 0112 7.3 4.3 4.3 0 0119.5 10c0 5.6-7.5 10-7.5 10z"/></svg></button>
     <button class="card-hit" data-open="${p.id}" style="display:block;width:100%;text-align:left" aria-label="Ver ${esc(p.name)}">
       <div class="arch">${media(p)}${tag}</div>
       <div class="meta"><div class="name">${esc(p.name)}</div>
@@ -534,19 +522,19 @@ function renderCats(){
 }
 function filtered(){
   const q=query.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-  return PRODUCTS.filter(p=>(cat==='all'||p.cat===cat)&&(!favOnly||favs.has(String(p.id)))&&
+  return PRODUCTS.filter(p=>(cat==='all'||p.cat===cat)&&
     (!q||(p.name+' '+p.catName+' '+p.desc+' '+p.colors.join(' ')).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').includes(q)));
 }
 function renderGrid(){
   const items=filtered();
   const cname=cat==='all'?'Colección':(CATS.find(c=>c.id===cat)||{}).name||'Colección';
-  $('#gridTitle').textContent=favOnly?'Mis favoritos':cname;
+  $('#gridTitle').textContent=cname;
   $('#gridCount').textContent=items.length?`${items.length} ${items.length===1?'pieza':'piezas'}`:'';
   $('#grid').innerHTML=items.length?items.map(card).join(''):
-    `<div class="empty" style="grid-column:1/-1"><b>${favOnly?'Aún sin favoritos':!PRODUCTS.length?'Muy pronto':'Nada por aquí'}</b>
-     ${favOnly?'Toca el corazón de una pieza para guardarla aquí.':!PRODUCTS.length?'Estamos preparando la colección. Escríbenos por WhatsApp para ver lo disponible.':'Prueba otra categoría o cambia la búsqueda.'}</div>`;
+    `<div class="empty" style="grid-column:1/-1"><b>${!PRODUCTS.length?'Muy pronto':'Nada por aquí'}</b>
+     ${!PRODUCTS.length?'Estamos preparando la colección. Escríbenos por WhatsApp para ver lo disponible.':'Prueba otra categoría o cambia la búsqueda.'}</div>`;
   const news=PRODUCTS.filter(p=>p.isNew&&!p.out);
-  $('#newSec').hidden=!(news.length&&cat==='all'&&!query&&!favOnly);
+  $('#newSec').hidden=!(news.length&&cat==='all'&&!query);
   $('#rail').innerHTML=news.map(card).join('');
   railReset();
 }
@@ -598,7 +586,6 @@ function renderSkeleton(){$('#grid').innerHTML=Array(6).fill('<div class="card s
 function badges(){
   const n=cart.reduce((a,i)=>a+i.qty,0), t=cart.reduce((a,i)=>a+i.qty*i.price,0);
   const b=$('#cartCount');b.textContent=n;b.classList.toggle('show',n>0);
-  const f=$('#favCount');f.textContent=favs.size;f.classList.toggle('show',favs.size>0);
   $('#float').classList.toggle('show',n>0&&!document.body.classList.contains('lock'));
   $('#floatTxt').textContent=`${n} · ${money(t)}`;
 }
@@ -665,7 +652,7 @@ function saveCart(){store.set('cart',cart);badges()}
 function renderCart(){
   const total=cart.reduce((a,i)=>a+i.qty*i.price,0);
   if(!cart.length){$('#cBody').innerHTML=`<h3 class="foil" id="cartTitle">Tu carrito</h3>
-    <div class="empty"><b>Está vacío</b>Explora la colección y agrega tus piezas favoritas.</div>
+    <div class="empty"><b>Está vacío</b>Explora la colección y agrega las piezas que te gusten.</div>
     <button class="btn" data-close>Ver colección</button>`;return}
   const needAddr=buyer.delivery!=='Recoger';
   $('#cBody').innerHTML=`<h3 class="foil" id="cartTitle">Tu carrito</h3>
@@ -710,11 +697,8 @@ let tt;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('sh
 document.addEventListener('click',e=>{
   const t=e.target.closest('button,[data-close],#veil');if(!t)return;
   if(t.id==='veil'||t.hasAttribute('data-close'))return hide();
-  if(t.dataset.fav){const id=String(t.dataset.fav);favs.has(id)?favs.delete(id):favs.add(id);store.set('favs',[...favs]);
-    $$(`[data-fav="${id}"]`).forEach(b=>{b.classList.toggle('on',favs.has(id));b.setAttribute('aria-pressed',favs.has(id))});
-    if(favs.has(id))toast('Guardado en favoritos');badges();if(favOnly)renderGrid();return}
   if(t.dataset.open)return openProduct(t.dataset.open);
-  if(t.dataset.cat){cat=t.dataset.cat;favOnly=false;$('#bFavs').classList.remove('on');$('#bFavs').setAttribute('aria-pressed','false');renderCats();renderGrid();
+  if(t.dataset.cat){cat=t.dataset.cat;renderCats();renderGrid();
     const g=$('#grid').getBoundingClientRect().top+scrollY-($('header.top').offsetHeight+70);if(scrollY>g)scrollTo({top:g,behavior:'smooth'});return}
   const opt=t.parentElement&&t.parentElement.dataset.opt;
   if(opt){sel[opt]=t.dataset.v;$$(`[data-opt="${opt}"] .chip`).forEach(c=>c.setAttribute('aria-pressed',c===t));return}
@@ -727,8 +711,6 @@ document.addEventListener('click',e=>{
   if(t.dataset.dl){readBuyer();buyer.delivery=t.dataset.dl;store.set('buyer',buyer);return renderCart()}
   if(t.id==='checkout')return checkout();
   if(t.id==='bCart'||t.id==='float'){renderCart();return show('#cart')}
-  if(t.id==='bFavs'){favOnly=!favOnly;t.classList.toggle('on',favOnly);t.setAttribute('aria-pressed',favOnly);renderGrid();
-    if(favOnly)scrollTo({top:$('#grid').getBoundingClientRect().top+scrollY-($('header.top').offsetHeight+70),behavior:'smooth'});return}
   if(t.id==='bSearch'){const b=$('#searchBox'),o=!b.classList.contains('open');b.classList.toggle('open',o);t.setAttribute('aria-expanded',o);if(o)$('#q').focus();else{query='';$('#q').value='';renderGrid()}}
 });
 $('#q').addEventListener('input',e=>{query=e.target.value;renderGrid()});
