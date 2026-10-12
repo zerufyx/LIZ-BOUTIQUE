@@ -150,6 +150,9 @@ h2.sec::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(
 .rail{display:flex;gap:14px;overflow-x:auto;scroll-snap-type:x mandatory;padding:4px 2px 12px;scrollbar-width:none}
 .rail::-webkit-scrollbar{display:none}
 .rail .card{flex:0 0 min(58%,240px);scroll-snap-align:start}
+.rail-dots{display:flex;justify-content:center;gap:6px;margin:2px 0 6px}
+.rail-dots i{width:6px;height:6px;border-radius:999px;background:var(--rose);opacity:.55;transition:width .35s,opacity .35s,background .35s}
+.rail-dots i.on{width:18px;opacity:1;background:var(--gold)}
 
 /* grilla con marcos en arco (espejo de boutique) */
 .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px 14px}
@@ -332,6 +335,7 @@ footer .small{font-size:13px;margin-top:10px;opacity:.8}
   <section id="newSec" hidden>
     <h2 class="sec"><span class="foil">Lo nuevo</span><small>recién llegado</small></h2>
     <div class="rail" id="rail"></div>
+    <div class="rail-dots" id="railDots" aria-hidden="true"></div>
   </section>
 
   <section>
@@ -544,7 +548,40 @@ function renderGrid(){
   const news=PRODUCTS.filter(p=>p.isNew&&!p.out);
   $('#newSec').hidden=!(news.length&&cat==='all'&&!query&&!favOnly);
   $('#rail').innerHTML=news.map(card).join('');
+  railReset();
 }
+/* =========================================================
+   VITRINA "LO NUEVO": avanza sola como banner; se pausa si la clienta la toca
+   ========================================================= */
+const RAIL={timer:null,pauseUntil:0,visible:true,every:3200};
+function railCards(){return $$('#rail .card')}
+function railIndex(){const r=$('#rail'),cs=railCards();if(!cs.length)return 0;
+  let best=0,d=1e9;cs.forEach((c,i)=>{const x=Math.abs(c.offsetLeft-r.offsetLeft-r.scrollLeft);if(x<d){d=x;best=i}});return best}
+function railDots(){const n=railCards().length,box=$('#railDots');if(!box)return;
+  const r=$('#rail');const fits=r.scrollWidth<=r.clientWidth+4;
+  box.innerHTML=n>1&&!fits?Array.from({length:n},(_,i)=>`<i class="${i===railIndex()?'on':''}"></i>`).join(''):''}
+function railStep(){
+  const r=$('#rail'),cs=railCards();
+  if(!cs.length||$('#newSec').hidden||!RAIL.visible||document.hidden||openEl||Date.now()<RAIL.pauseUntil)return;
+  if(r.scrollWidth<=r.clientWidth+4)return;
+  const atEnd=r.scrollLeft+r.clientWidth>=r.scrollWidth-6;
+  const next=atEnd?0:Math.min(cs.length-1,railIndex()+1);
+  r.scrollTo({left:cs[next].offsetLeft-r.offsetLeft,behavior:'smooth'});
+}
+function railReset(){
+  const r=$('#rail');r.scrollLeft=0;railDots();
+  clearInterval(RAIL.timer);
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  RAIL.timer=setInterval(railStep,RAIL.every);
+}
+(function railInit(){
+  const r=$('#rail');
+  const pause=()=>{RAIL.pauseUntil=Date.now()+7000};
+  ['pointerdown','touchstart','wheel'].forEach(ev=>r.addEventListener(ev,pause,{passive:true}));
+  let st;r.addEventListener('scroll',()=>{clearTimeout(st);st=setTimeout(railDots,80)},{passive:true});
+  if('IntersectionObserver'in window)new IntersectionObserver(e=>{RAIL.visible=e[0].isIntersecting},{threshold:.3}).observe(r);
+  addEventListener('resize',railDots);
+})();
 function renderSkeleton(){$('#grid').innerHTML=Array(6).fill('<div class="card skel"><div class="arch"></div></div>').join('')}
 function badges(){
   const n=cart.reduce((a,i)=>a+i.qty,0), t=cart.reduce((a,i)=>a+i.qty*i.price,0);
