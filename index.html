@@ -560,7 +560,7 @@ function filtered(){
 function renderGrid(){
   const items=filtered();
   const cname=cat==='all'?'Colección':(CATS.find(c=>c.id===cat)||{}).name||'Colección';
-  const C=CATS.find(c=>c.id===cat), subs=C&&C.subs?C.subs.filter(x=>PRODUCTS.some(p=>p.sub===x.id)):[];
+  const C=CATS.find(c=>c.id===cat), subs=C&&C.subs?C.subs:[];
   if(sub&&!subs.some(x=>x.id===sub))sub='';
   $('#gridTitle').textContent=sub?(subs.find(x=>x.id===sub)||{}).name||cname:cname;$('#gridBack').hidden=cat==='all';
   $('#subs').hidden=!subs.length;
@@ -568,8 +568,8 @@ function renderGrid(){
   renderCovers();
   $('#gridCount').textContent=items.length?`${items.length} ${items.length===1?'pieza':'piezas'}`:'';
   $('#grid').innerHTML=items.length?items.map(card).join(''):
-    `<div class="empty" style="grid-column:1/-1"><b>${!PRODUCTS.length?'Muy pronto':'Nada por aquí'}</b>
-     ${!PRODUCTS.length?'Estamos preparando la colección. Escríbenos por WhatsApp para ver lo disponible.':'Prueba otra categoría o cambia la búsqueda.'}</div>`;
+    `<div class="empty" style="grid-column:1/-1"><b>${!PRODUCTS.length||sub?'Muy pronto':'Nada por aquí'}</b>
+     ${!PRODUCTS.length||sub?'Estamos preparando esta sección. Escríbenos por WhatsApp para ver lo disponible.':'Prueba otra categoría o cambia la búsqueda.'}</div>`;
   const news=PRODUCTS.filter(p=>p.isNew&&!p.out);
   $('#newSec').hidden=!(news.length&&cat==='all'&&!query);
   $('#rail').innerHTML=news.map(card).join('');
