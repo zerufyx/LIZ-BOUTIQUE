@@ -138,6 +138,9 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:55;
 .cover .cover-name{display:grid;place-items:center;aspect-ratio:1;padding:12px;font-family:var(--script);font-size:38px;color:var(--ink);text-align:center}
 .grid-back{display:inline-flex;align-items:center;gap:6px;margin:-4px 2px 12px;font:600 13px var(--caps);letter-spacing:.04em;color:var(--gold-dk)}
 .grid-back[hidden]{display:none}
+.subs{display:flex;gap:8px;overflow-x:auto;margin:0 -16px 16px;padding:0 16px;scrollbar-width:none}
+.subs::-webkit-scrollbar{display:none}
+.subs[hidden]{display:none}
 
 /* =========================================================
    CONTENIDO
@@ -344,6 +347,7 @@ footer .small{font-size:13px;margin-top:10px;opacity:.8}
   <section id="gridSec">
     <h2 class="sec"><span class="foil" id="gridTitle">Colección</span><small id="gridCount"></small></h2>
     <button class="grid-back" id="gridBack" data-cat="all" hidden>← Todas las categorías</button>
+    <nav class="subs" id="subs" aria-label="Subcategorías" hidden></nav>
     <div class="grid" id="grid" aria-live="polite"></div>
   </section>
 </main>
@@ -457,7 +461,7 @@ const DEMO=[
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const store={get(k,d){try{const v=localStorage.getItem('liz_'+k);return v?JSON.parse(v):d}catch(e){return d}},
              set(k,v){try{localStorage.setItem('liz_'+k,JSON.stringify(v))}catch(e){}}};
-let PRODUCTS=[],CATS=[],cat='all',query='';
+let PRODUCTS=[],CATS=[],cat='all',sub='',query='';
 let cart=store.get('cart',[]);
 let buyer=store.get('buyer',{name:'',delivery:'Entrega local',address:'',notes:''});
 const money=n=>new Intl.NumberFormat(CONFIG.locale,{style:'currency',currency:CONFIG.currency}).format(+n||0);
@@ -502,7 +506,13 @@ async function load(){
             if(cc.facebook)CONFIG.facebook=cc.facebook;if(cc.entrega)CONFIG.deliveryNote=cc.entrega}}catch(e){}
       const map={};cats.forEach(c=>map[c.id]=c.name||c.nombre);
       PRODUCTS=rows.map(r=>norm(r,map)).sort((a,b)=>a.order-b.order);
-      CATS=cats.length?cats.map(c=>({id:String(c.id).toLowerCase(),name:c.name||c.nombre,img:c.image_url||''}))
+      /* subcategorías: el producto queda en su categoría principal y guarda la sub */
+      const parentOf={};cats.forEach(c=>{if(c.parent_id)parentOf[String(c.id)]=String(c.parent_id)});
+      PRODUCTS.forEach(p=>{p.sub='';p.subName='';const par=parentOf[p.cat];
+        if(par){p.sub=p.cat;p.subName=p.catName;p.cat=par;p.catName=map[par]||p.catName}});
+      const top=cats.filter(c=>!c.parent_id||!cats.some(x=>x.id===c.parent_id));
+      CATS=cats.length?top.map(c=>({id:String(c.id).toLowerCase(),name:c.name||c.nombre,img:c.image_url||'',
+          subs:cats.filter(x=>x.parent_id===c.id).map(x=>({id:String(x.id),name:x.name}))}))
         :[...new Map(PRODUCTS.filter(p=>p.catName).map(p=>[p.cat,{id:p.cat,name:p.catName}])).values()];
       return;
     }catch(e){console.warn('Supabase no respondió, usando demo:',e)}
@@ -544,13 +554,17 @@ function renderCovers(){
 }
 function filtered(){
   const q=query.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-  return PRODUCTS.filter(p=>(cat==='all'||p.cat===cat)&&
-    (!q||(p.name+' '+p.catName+' '+p.desc+' '+p.colors.join(' ')).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').includes(q)));
+  return PRODUCTS.filter(p=>(cat==='all'||p.cat===cat)&&(!sub||p.sub===sub)&&
+    (!q||(p.name+' '+p.catName+' '+(p.subName||'')+' '+p.desc+' '+p.colors.join(' ')).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').includes(q)));
 }
 function renderGrid(){
   const items=filtered();
   const cname=cat==='all'?'Colección':(CATS.find(c=>c.id===cat)||{}).name||'Colección';
-  $('#gridTitle').textContent=cname;$('#gridBack').hidden=cat==='all';
+  const C=CATS.find(c=>c.id===cat), subs=C&&C.subs?C.subs.filter(x=>PRODUCTS.some(p=>p.sub===x.id)):[];
+  if(sub&&!subs.some(x=>x.id===sub))sub='';
+  $('#gridTitle').textContent=sub?(subs.find(x=>x.id===sub)||{}).name||cname:cname;$('#gridBack').hidden=cat==='all';
+  $('#subs').hidden=!subs.length;
+  $('#subs').innerHTML=subs.length?[{id:'',name:'Todo'},...subs].map(x=>`<button class="cat" data-sub="${esc(x.id)}" aria-pressed="${sub===x.id}">${esc(x.name)}</button>`).join(''):'';
   renderCovers();
   $('#gridCount').textContent=items.length?`${items.length} ${items.length===1?'pieza':'piezas'}`:'';
   $('#grid').innerHTML=items.length?items.map(card).join(''):
@@ -722,7 +736,8 @@ document.addEventListener('click',e=>{
   const t=e.target.closest('button,[data-close],#veil');if(!t)return;
   if(t.id==='veil'||t.hasAttribute('data-close'))return hide();
   if(t.dataset.open)return openProduct(t.dataset.open);
-  if(t.dataset.cat){cat=t.dataset.cat;renderCats();renderGrid();
+  if(t.hasAttribute('data-sub')){sub=t.dataset.sub;renderGrid();return}
+  if(t.dataset.cat){cat=t.dataset.cat;sub='';renderCats();renderGrid();
     const g=$('#gridSec').getBoundingClientRect().top+scrollY-($('header.top').offsetHeight+8);scrollTo({top:Math.max(0,g),behavior:'smooth'});return}
   const opt=t.parentElement&&t.parentElement.dataset.opt;
   if(opt){sel[opt]=t.dataset.v;$$(`[data-opt="${opt}"] .chip`).forEach(c=>c.setAttribute('aria-pressed',c===t));return}

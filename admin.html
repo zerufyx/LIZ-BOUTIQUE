@@ -159,6 +159,23 @@ main{max-width:980px;margin:0 auto;padding:18px 16px 110px}
 .bulk-bar{height:6px;border-radius:999px;background:var(--panel-2);overflow:hidden}
 .bulk-bar i{display:block;height:100%;width:0;background:var(--gold);transition:width .3s}
 
+/* Selección múltiple */
+.th{position:relative}
+.chk{position:absolute;top:4px;left:4px;width:22px;height:22px;border-radius:50%;border:2px solid #fff;background:rgba(27,20,20,.35);display:grid;place-items:center;color:#fff;font-size:12px;font-weight:700;box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.row.pick{cursor:pointer;user-select:none}
+.row.pick .acts{display:none}
+.row.on{background:rgba(197,156,104,.16)}
+.row.on .chk{background:var(--gold);border-color:var(--gold)}
+.stats .sel-btn{margin-left:auto}
+body.selecting main{padding-bottom:210px}
+.selbar{position:fixed;left:0;right:0;bottom:0;z-index:30;background:rgba(255,250,248,.97);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  border-top:1px solid var(--line-strong);padding:12px 16px calc(env(safe-area-inset-bottom,0px) + 12px);box-shadow:0 -12px 30px -18px rgba(27,20,20,.35)}
+.selbar-in{max-width:980px;margin:0 auto;display:flex;flex-direction:column;gap:10px}
+.selbar-top{display:flex;align-items:center;gap:8px}
+.selbar-top b{flex:1;font-size:15px}
+.selbar-act{display:flex;gap:8px}
+.selbar-act .inp{flex:1;min-width:0}
+
 /* Categorías */
 .cat-row{display:grid;grid-template-columns:64px 1fr auto;gap:10px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--line)}
 .cov{position:relative;width:64px;height:64px;border-radius:10px;overflow:hidden;border:1px dashed var(--line-strong);background:#fff;display:grid;place-items:center;color:var(--muted)}
@@ -166,6 +183,10 @@ main{max-width:980px;margin:0 auto;padding:18px 16px 110px}
 .cov .ed{position:absolute;inset:auto 0 0 0;font-size:9.5px;font-weight:600;background:rgba(27,20,20,.72);color:#fff;padding:2px 0;text-align:center}
 .cov.loading::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 30%,rgba(197,156,104,.35) 50%,transparent 70%);background-size:300% 100%;animation:sk 1s infinite}
 .cat-row:last-child{border-bottom:0}
+.cat-row.kid{background:rgba(249,225,223,.28)}
+.kid-mark{display:grid;place-items:center;color:var(--gold);font-size:20px;font-weight:600}
+.add-cat{flex-wrap:wrap}
+.add-cat .inp{flex:1 1 170px}
 .cat-row .inp{height:40px;background:transparent;border-color:transparent}
 .cat-row .inp:hover{border-color:var(--line)}
 .cat-row .inp:focus{border-color:var(--blue);background:var(--deep)}
@@ -183,6 +204,7 @@ main{max-width:980px;margin:0 auto;padding:18px 16px 110px}
   .top .tag{display:none}
   .cat-row{grid-template-columns:52px 1fr auto;gap:8px;padding:10px}
   .cat-row .cov{width:52px;height:52px}
+  .add-cat .btn{flex:1 1 100%}
   .cat-row .acts{gap:4px}
   .cat-row .ibtn{width:34px;height:34px}
   .cat-row .inp{padding:0 8px}
@@ -258,10 +280,11 @@ main{max-width:980px;margin:0 auto;padding:18px 16px 110px}
     <div id="tab-cats" class="hide">
       <div class="list" id="cList"></div>
       <form class="add-cat" id="addCat">
-        <input class="inp" id="newCat" placeholder="Nueva categoría" required>
+        <input class="inp" id="newCat" placeholder="Nombre (ej: Camisas)" required>
+        <select class="inp" id="newCatParent" aria-label="Dónde va"></select>
         <button class="btn btn-blue" type="submit">Agregar</button>
       </form>
-      <p class="hint" style="margin-top:12px">Toca la foto para poner o cambiar la portada (sale completa en el catálogo). Toca un nombre para cambiarlo. Las flechas cambian el orden. Solo puedes borrar categorías vacías.</p>
+      <p class="hint" style="margin-top:12px"><b>Subcategorías:</b> escribe el nombre y elige en qué categoría va (ej: Camisas dentro de Ropa de hombre). En el catálogo salen como botones al entrar a esa categoría.<br>Toca la foto para poner o cambiar la portada. Toca un nombre para cambiarlo. Las flechas cambian el orden. Solo puedes borrar categorías vacías.</p>
       <input type="file" id="coverFile" accept="image/*" hidden>
     </div>
 
@@ -340,6 +363,26 @@ main{max-width:980px;margin:0 auto;padding:18px 16px 110px}
     <button class="btn btn-blue" id="pSave" type="submit" form="pForm">Guardar</button>
   </div>
 </aside>
+
+<!-- ============ BARRA DE SELECCIÓN ============ -->
+<div class="selbar hide" id="selBar" role="region" aria-label="Productos seleccionados">
+  <div class="selbar-in">
+    <div class="selbar-top">
+      <b id="selN">0 seleccionados</b>
+      <button type="button" class="btn btn-line btn-sm" id="selAll">Todos</button>
+      <button type="button" class="btn btn-line btn-sm" id="selCancel">Cancelar</button>
+    </div>
+    <div class="selbar-act">
+      <select class="inp" id="selTo" aria-label="Mover a"></select>
+      <button type="button" class="btn btn-blue" id="selMove">Mover</button>
+    </div>
+    <div class="selbar-act">
+      <button type="button" class="btn btn-line btn-sm" data-selflag="sold_out" style="flex:1">Agotado</button>
+      <button type="button" class="btn btn-line btn-sm" data-selflag="hidden" style="flex:1">Ocultar</button>
+      <button type="button" class="btn btn-bad btn-sm" id="selDel" style="flex:1">Borrar</button>
+    </div>
+  </div>
+</div>
 
 <!-- ============ CARGA RÁPIDA ============ -->
 <aside class="sheet" id="bulk" role="dialog" aria-modal="true" aria-labelledby="bkTitle">
@@ -480,27 +523,40 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
 });
 
 /* ================= PRODUCTOS ================= */
-function catName(id){ return (CATS.find(c=>c.id===id)||{}).name||"Sin categoría"; }
+/* categorías y subcategorías (una sub tiene parent_id) */
+const TOP=()=>CATS.filter(c=>!c.parent_id||!CATS.some(x=>x.id===c.parent_id));
+const KIDS=id=>CATS.filter(c=>c.parent_id===id);
+const isKid=c=>!!(c.parent_id&&CATS.some(x=>x.id===c.parent_id));
+function catTree(){ const out=[]; TOP().forEach(t=>{ out.push({c:t,d:0}); KIDS(t.id).forEach(k=>out.push({c:k,d:1})); }); return out; }
+function catName(id){ const c=CATS.find(x=>x.id===id); if(!c) return "Sin categoría"; const p=isKid(c)&&CATS.find(x=>x.id===c.parent_id); return p?`${p.name} › ${c.name}`:c.name; }
+const catOptions=()=>catTree().map(({c})=>`<option value="${c.id}">${esc(catName(c.id))}</option>`).join("");
+const inCat=(p,fc)=>{ if(!fc) return true; if(String(p.category_id)===fc) return true; const c=CATS.find(x=>x.id===p.category_id); return !!(c&&String(c.parent_id)===fc); };
 function fillCatSelects(){
   const cur=$("#fCat").value;
-  $("#fCat").innerHTML=`<option value="">Todas las categorías</option>`+CATS.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join("");
+  $("#fCat").innerHTML=`<option value="">Todas las categorías</option>`+catOptions();
   $("#fCat").value=cur;
-  $("#pCat").innerHTML=CATS.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join("")+`<option value="">Sin categoría</option>`;
+  $("#pCat").innerHTML=catOptions()+`<option value="">Sin categoría</option>`;
+  const np=$("#newCatParent").value;
+  $("#newCatParent").innerHTML=`<option value="">Categoría principal</option>`+TOP().map(c=>`<option value="${c.id}">Dentro de ${esc(c.name)}</option>`).join("");
+  $("#newCatParent").value=np;
+  $("#selTo").innerHTML=`<option value="" disabled selected>Mover a…</option>`+catOptions()+`<option value="none">Sin categoría</option>`;
 }
 function renderProds(){
   $("#nProd").textContent=PRODS.length;
   const q=$("#search").value.trim().toLowerCase(), fc=$("#fCat").value, fs=$("#fState").value;
-  const r=PRODS.filter(p=>(!q||p.name.toLowerCase().includes(q))&&(!fc||String(p.category_id)===fc)&&
+  const r=PRODS.filter(p=>(!q||p.name.toLowerCase().includes(q))&&inCat(p,fc)&&
     (!fs||(fs==="visible"&&!p.hidden&&!p.sold_out)||(fs==="sold"&&p.sold_out)||(fs==="hidden"&&p.hidden)));
   const vis=PRODS.filter(p=>!p.hidden).length, sold=PRODS.filter(p=>p.sold_out).length;
-  $("#stats").innerHTML=`<span><b>${vis}</b> visibles</span><span><b>${sold}</b> agotados</span><span><b>${PRODS.length-vis}</b> ocultos</span>`;
+  LAST=r;
+  $("#stats").innerHTML=`<span><b>${vis}</b> visibles</span><span><b>${sold}</b> agotados</span><span><b>${PRODS.length-vis}</b> ocultos</span>`
+    +(SELMODE||!PRODS.length?"":`<button type="button" class="btn btn-line btn-sm sel-btn" id="selStart">Seleccionar</button>`);
   if(!r.length){ $("#pList").innerHTML=`<div class="empty"><strong>${PRODS.length?"Nada coincide con el filtro":"Aún no hay productos"}</strong>${PRODS.length?"Cambia la búsqueda o el filtro.":"Toca “Nuevo producto” para agregar el primero."}</div>`; return; }
   $("#pList").innerHTML=r.map(p=>{
     const img=(p.images&&p.images[0])||p.image_url;
     const pills=[p.featured&&'<span class="pill">Destacado</span>',p.is_new&&'<span class="pill">Nuevo</span>',p.sold_out&&'<span class="pill warn">Agotado</span>',p.hidden&&'<span class="pill off">Oculto</span>'].filter(Boolean).join("");
     const price=p.discount_price?`<span class="pr">${money(p.discount_price)}</span><s>${money(p.price)}</s>`:`<span class="pr">${money(p.price)}</span>`;
-    return `<div class="row ${p.hidden?"dim":""}">
-      <div class="th">${img?`<img src="${esc(img)}" alt="" loading="lazy">`:ic("img",1.5)}</div>
+    return `<div class="row ${p.hidden?"dim":""} ${SELMODE?"pick":""} ${SEL.has(p.id)?"on":""}" data-pick="${p.id}">
+      <div class="th">${img?`<img src="${esc(img)}" alt="" loading="lazy">`:ic("img",1.5)}${SELMODE?`<span class="chk">${SEL.has(p.id)?"✓":""}</span>`:""}</div>
       <div class="meta" data-edit="${p.id}"><h4>${esc(p.name)}</h4><div class="sub">${price}<span>${esc(catName(p.category_id))}</span>${pills}</div></div>
       <div class="acts">
         <label class="sw"><input type="checkbox" data-flag="sold_out" data-id="${p.id}" ${p.sold_out?"checked":""}><span class="t"></span>Agotado</label>
@@ -510,7 +566,54 @@ function renderProds(){
   }).join("");
 }
 ["#search","#fCat","#fState"].forEach(s=>$(s).addEventListener("input",renderProds));
-$("#pList").addEventListener("click",e=>{ const t=e.target.closest("[data-edit]"); if(t) openEditor(+t.dataset.edit); });
+$("#pList").addEventListener("click",e=>{
+  if(SELMODE){ const r=e.target.closest("[data-pick]"); if(r){ const id=+r.dataset.pick; SEL.has(id)?SEL.delete(id):SEL.add(id); renderProds(); selBar(); } return; }
+  const t=e.target.closest("[data-edit]"); if(t) openEditor(+t.dataset.edit);
+});
+
+/* ---------- Selección múltiple: mover, agotar, ocultar o borrar varios ---------- */
+let SELMODE=false, LAST=[]; const SEL=new Set();
+function selBar(){
+  const n=SEL.size; $("#selN").textContent=`${n} ${n===1?"seleccionado":"seleccionados"}`;
+  const allOn=LAST.length&&LAST.every(p=>SEL.has(p.id)); $("#selAll").textContent=allOn?"Ninguno":"Todos";
+  ["#selMove","#selDel"].forEach(k=>$(k).disabled=!n); document.querySelectorAll("[data-selflag]").forEach(b=>b.disabled=!n);
+  const fl=k=>n&&[...SEL].every(id=>(PRODS.find(p=>p.id===id)||{})[k]);
+  document.querySelector('[data-selflag="sold_out"]').textContent=fl("sold_out")?"Disponible":"Agotado";
+  document.querySelector('[data-selflag="hidden"]').textContent=fl("hidden")?"Mostrar":"Ocultar";
+}
+function startSel(){ SELMODE=true; SEL.clear(); document.body.classList.add("selecting"); $("#selBar").classList.remove("hide"); $("#newProd").classList.add("hide"); $("#bulkBtn").classList.add("hide"); renderProds(); selBar(); }
+function endSel(){ if(!SELMODE) return; SELMODE=false; SEL.clear(); document.body.classList.remove("selecting"); $("#selBar").classList.add("hide"); $("#newProd").classList.remove("hide"); $("#bulkBtn").classList.remove("hide"); renderProds(); }
+$("#stats").addEventListener("click",e=>{ if(e.target.closest("#selStart")) startSel(); });
+$("#selCancel").onclick=endSel;
+$("#selAll").onclick=()=>{ const allOn=LAST.every(p=>SEL.has(p.id)); LAST.forEach(p=>allOn?SEL.delete(p.id):SEL.add(p.id)); renderProds(); selBar(); };
+const idsIn=()=>`(${[...SEL].join(",")})`;
+$("#selMove").onclick=async()=>{
+  const v=$("#selTo").value; if(!v) return toast("Elige a dónde moverlos",true), $("#selTo").focus();
+  const to=v==="none"?null:+v, n=SEL.size;
+  $("#selMove").disabled=true;
+  try{ await api(`products?id=in.${idsIn()}`,{method:"PATCH",body:{category_id:to,updated_at:new Date().toISOString()}});
+    await loadProds(); endSel(); toast(`${n} ${n===1?"producto movido":"productos movidos"} a ${to?catName(to):"Sin categoría"}`); }
+  catch(err){ toast(err.message,true); $("#selMove").disabled=false; }
+};
+document.querySelectorAll("[data-selflag]").forEach(b=>b.onclick=async()=>{
+  const k=b.dataset.selflag, n=SEL.size, v=![...SEL].every(id=>(PRODS.find(p=>p.id===id)||{})[k]);
+  const body={[k]:v,updated_at:new Date().toISOString()}; if(k==="sold_out") body.in_stock=!v;
+  try{ await api(`products?id=in.${idsIn()}`,{method:"PATCH",body}); await loadProds(); endSel();
+    toast(k==="sold_out"?(v?`${n} marcados como agotados`:`${n} disponibles de nuevo`):(v?`${n} ocultos del catálogo`:`${n} visibles en el catálogo`)); }
+  catch(err){ toast(err.message,true); }
+});
+/* borra fotos solo si ningún otro producto las usa */
+function cleanFiles(gone){
+  const keep=new Set(PRODS.filter(p=>!gone.some(g=>g.id===p.id)).flatMap(p=>[...(p.images||[]),p.image_url]).filter(Boolean));
+  [...new Set(gone.flatMap(p=>[...(p.images||[]),p.image_url]).filter(Boolean))].filter(u=>!keep.has(u)).forEach(removeFile);
+}
+$("#selDel").onclick=async()=>{
+  const n=SEL.size; if(!n||!confirm(`¿Borrar ${n} ${n===1?"producto":"productos"}? No se puede deshacer.`)) return;
+  const gone=PRODS.filter(p=>SEL.has(p.id));
+  try{ await api(`products?id=in.${idsIn()}`,{method:"DELETE"}); cleanFiles(gone); await loadProds(); endSel(); toast(`${n} ${n===1?"producto borrado":"productos borrados"}`); }
+  catch(err){ toast(err.message.includes("foreign key")?"Alguno tiene movimientos registrados. Ocúltalo en su lugar.":err.message,true); }
+};
+document.querySelectorAll(".tab").forEach(t=>t.addEventListener("click",()=>{ if(t.dataset.tab!=="products") endSel(); }));
 $("#pList").addEventListener("change",async e=>{
   const t=e.target.closest("[data-flag]"); if(!t) return;
   const p=PRODS.find(x=>x.id===+t.dataset.id), f=t.dataset.flag, v=t.checked;
@@ -547,7 +650,7 @@ document.addEventListener("keydown",e=>{ if(e.key!=="Escape") return; if(BULK.op
 const BULK={open:false,files:[],urls:[],running:false};
 function openBulk(){
   BULK.open=true; BULK.files=[]; BULK.urls.forEach(u=>URL.revokeObjectURL(u)); BULK.urls=[];
-  $("#bkCat").innerHTML=CATS.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join("")+`<option value="">Sin categoría</option>`;
+  $("#bkCat").innerHTML=catOptions()+`<option value="">Sin categoría</option>`;
   const fc=$("#fCat").value; if(fc) $("#bkCat").value=fc;
   ["#bkName","#bkPrice","#bkDisc","#bkSizes","#bkColors"].forEach(k=>$(k).value="");
   $("#bkNum").checked=true; $("#bkNew").checked=true; $("#bkProg").classList.add("hide"); $("#bkBar").style.width="0";
@@ -684,22 +787,26 @@ $("#pForm").addEventListener("submit",async e=>{
 });
 $("#pDelete").onclick=async()=>{
   const p=PRODS.find(x=>x.id===EDIT.id); if(!p||!confirm(`¿Borrar “${p.name}”? No se puede deshacer.`)) return;
-  try{ await api(`products?id=eq.${p.id}`,{method:"DELETE"}); [...(p.images||[]),p.image_url].filter(Boolean).forEach(removeFile);
+  try{ await api(`products?id=eq.${p.id}`,{method:"DELETE"}); cleanFiles([p]);
     closeEditor(); await loadProds(); toast("Producto borrado"); }
   catch(err){ toast(err.message.includes("foreign key")?"No se puede borrar: tiene movimientos registrados. Ocúltalo en su lugar.":err.message,true); }
 };
 
 /* ================= CATEGORÍAS ================= */
 function renderCats(){
-  $("#nCat").textContent=CATS.length;
+  $("#nCat").textContent=TOP().length;
   if(!CATS.length){ $("#cList").innerHTML='<div class="empty"><strong>Sin categorías</strong>Agrega la primera abajo.</div>'; return; }
-  $("#cList").innerHTML=CATS.map((c,i)=>{ const n=PRODS.filter(p=>p.category_id===c.id).length; return `<div class="cat-row">
-    <button class="cov" type="button" data-cover="${c.id}" aria-label="Portada de ${esc(c.name)}">${c.image_url?`<img src="${esc(c.image_url)}" alt="">`:ic("img",1.5)}<span class="ed">${c.image_url?"Cambiar":"Portada"}</span></button>
-    <div><input class="inp" value="${esc(c.name)}" data-rename="${c.id}" aria-label="Nombre de categoría"><span class="cnt">${n} ${n===1?"producto":"productos"}</span></div>
+  $("#cList").innerHTML=catTree().map(({c,d})=>{
+    const sib=d?KIDS(c.parent_id):TOP(), i=sib.indexOf(c), kids=d?[]:KIDS(c.id);
+    const own=PRODS.filter(p=>p.category_id===c.id).length, n=own+kids.reduce((a,k)=>a+PRODS.filter(p=>p.category_id===k.id).length,0);
+    const busy=own||kids.length;
+    return `<div class="cat-row${d?" kid":""}">
+    ${d?`<span class="kid-mark" aria-hidden="true">↳</span>`:`<button class="cov" type="button" data-cover="${c.id}" aria-label="Portada de ${esc(c.name)}">${c.image_url?`<img src="${esc(c.image_url)}" alt="">`:ic("img",1.5)}<span class="ed">${c.image_url?"Cambiar":"Portada"}</span></button>`}
+    <div><input class="inp" value="${esc(c.name)}" data-rename="${c.id}" aria-label="Nombre"><span class="cnt">${n} ${n===1?"producto":"productos"}${kids.length?` · ${kids.length} ${kids.length===1?"subcategoría":"subcategorías"}`:""}</span></div>
     <div class="acts">
-      <button class="ibtn" data-move="-1" data-i="${i}" ${i===0?"disabled":""} aria-label="Subir">${ic("up",2)}</button>
-      <button class="ibtn" data-move="1" data-i="${i}" ${i===CATS.length-1?"disabled":""} aria-label="Bajar">${ic("down",2)}</button>
-      <button class="ibtn" data-delcat="${c.id}" ${n?"disabled":""} aria-label="Borrar categoría" title="${n?"Mueve o borra sus productos primero":"Borrar"}">${ic("trash",1.8)}</button>
+      <button class="ibtn" data-move="-1" data-id="${c.id}" ${i===0?"disabled":""} aria-label="Subir">${ic("up",2)}</button>
+      <button class="ibtn" data-move="1" data-id="${c.id}" ${i===sib.length-1?"disabled":""} aria-label="Bajar">${ic("down",2)}</button>
+      <button class="ibtn" data-delcat="${c.id}" ${busy?"disabled":""} aria-label="Borrar" title="${busy?"Mueve sus productos y subcategorías primero":"Borrar"}">${ic("trash",1.8)}</button>
     </div></div>`; }).join("");
 }
 $("#cList").addEventListener("change",async e=>{
@@ -726,9 +833,11 @@ $("#cList").addEventListener("click",async e=>{
   const t=e.target.closest("button"); if(!t||t.disabled) return;
   if(t.dataset.cover){ coverFor=+t.dataset.cover; return $("#coverFile").click(); }
   if(t.dataset.move){
-    const i=+t.dataset.i, j=i+ +t.dataset.move; [CATS[i],CATS[j]]=[CATS[j],CATS[i]];
-    CATS.forEach((c,k)=>c.position=k+1); renderCats();
-    try{ await Promise.all([CATS[i],CATS[j]].map(c=>api(`categories?id=eq.${c.id}`,{method:"PATCH",body:{position:c.position}}))); fillCatSelects(); }
+    const c=CATS.find(x=>x.id===+t.dataset.id), sib=isKid(c)?KIDS(c.parent_id):TOP(), i=sib.indexOf(c), j=i+ +t.dataset.move;
+    if(j<0||j>=sib.length) return;
+    [sib[i],sib[j]]=[sib[j],sib[i]]; sib.forEach((x,k)=>x.position=k+1);
+    CATS.sort((a,b)=>(a.position-b.position)||(a.id-b.id)); renderCats();
+    try{ await Promise.all(sib.map(x=>api(`categories?id=eq.${x.id}`,{method:"PATCH",body:{position:x.position}}))); fillCatSelects(); }
     catch(err){ toast(err.message,true); loadCats(); }
   }
   if(t.dataset.delcat){
@@ -738,7 +847,9 @@ $("#cList").addEventListener("click",async e=>{
 });
 $("#addCat").addEventListener("submit",async e=>{
   e.preventDefault(); const v=$("#newCat").value.trim(); if(!v) return;
-  try{ await api("categories",{method:"POST",body:{store_id:STORE.id,name:v,position:CATS.length+1},prefer:"return=minimal"}); $("#newCat").value=""; await loadCats(); toast("Categoría agregada. Toca la foto para ponerle portada."); }
+  const par=$("#newCatParent").value?+$("#newCatParent").value:null, sib=par?KIDS(par):TOP();
+  try{ await api("categories",{method:"POST",body:{store_id:STORE.id,name:v,parent_id:par,position:sib.length+1},prefer:"return=minimal"}); $("#newCat").value=""; await loadCats();
+    toast(par?`Subcategoría agregada en ${catName(par)}`:"Categoría agregada. Toca la foto para ponerle portada."); }
   catch(err){ toast(err.message,true); }
 });
 
