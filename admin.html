@@ -148,6 +148,17 @@ main{max-width:980px;margin:0 auto;padding:18px 16px 110px}
 .chip button svg{width:12px;height:12px}
 .chips input{flex:1;min-width:120px;border:0;background:none;outline:none;height:30px;padding:0 6px;font-size:14px}
 
+/* Carga rápida */
+.bulk-cta{width:100%;margin:0 0 14px;justify-content:center;border-style:dashed}
+.bulk-cta b{font-weight:600}
+.bulk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:6px}
+.bulk-grid .ph{border-radius:10px}
+.bulk-grid .ph .n{position:absolute;left:5px;bottom:5px;font-size:10px;font-weight:700;background:rgba(27,20,20,.72);color:#fff;padding:1px 6px;border-radius:999px}
+.bulk-grid .ph.done::after{content:"✓";position:absolute;inset:0;display:grid;place-items:center;font-size:26px;font-weight:700;color:#fff;background:rgba(46,139,87,.45)}
+.bulk-grid .ph.fail::after{content:"!";position:absolute;inset:0;display:grid;place-items:center;font-size:26px;font-weight:700;color:#fff;background:rgba(179,57,75,.55)}
+.bulk-bar{height:6px;border-radius:999px;background:var(--panel-2);overflow:hidden}
+.bulk-bar i{display:block;height:100%;width:0;background:var(--gold);transition:width .3s}
+
 /* Categorías */
 .cat-row{display:grid;grid-template-columns:64px 1fr auto;gap:10px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--line)}
 .cov{position:relative;width:64px;height:64px;border-radius:10px;overflow:hidden;border:1px dashed var(--line-strong);background:#fff;display:grid;place-items:center;color:var(--muted)}
@@ -234,6 +245,8 @@ main{max-width:980px;margin:0 auto;padding:18px 16px 110px}
           <option value="hidden">Ocultos</option>
         </select>
       </div>
+      <button class="btn btn-line bulk-cta" id="bulkBtn" type="button">
+        <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg><b>Carga rápida:</b>&nbsp;varias fotos, mismo precio</button>
       <div class="stats" id="stats"></div>
       <div class="list" id="pList"></div>
       <button class="btn btn-blue fab" id="newProd">
@@ -325,6 +338,42 @@ main{max-width:980px;margin:0 auto;padding:18px 16px 110px}
   <div class="sh-foot">
     <button class="btn btn-bad" id="pDelete" type="button">Borrar</button>
     <button class="btn btn-blue" id="pSave" type="submit" form="pForm">Guardar</button>
+  </div>
+</aside>
+
+<!-- ============ CARGA RÁPIDA ============ -->
+<aside class="sheet" id="bulk" role="dialog" aria-modal="true" aria-labelledby="bkTitle">
+  <div class="sh-head">
+    <h3 id="bkTitle">Carga rápida</h3>
+    <button class="ibtn" id="bkClose" aria-label="Cerrar"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+  </div>
+  <form class="sh-body" id="bkForm" novalidate>
+    <p class="hint" style="margin:0">Cada foto se vuelve un producto con el mismo nombre, categoría y precio. Después puedes editar cualquiera por separado.</p>
+    <div class="group">
+      <p class="gt">Fotos <span class="hint" id="bkCount"></span></p>
+      <div class="bulk-grid" id="bkPhotos"></div>
+      <input type="file" id="bkFile" accept="image/*" multiple hidden>
+    </div>
+    <label class="f">Nombre<input class="inp" id="bkName" maxlength="80" placeholder="Ej: Gorra"></label>
+    <label class="sw"><input type="checkbox" id="bkNum" checked><span class="t"></span>Numerar los nombres (Gorra 1, Gorra 2…)</label>
+    <label class="f">Categoría<select class="inp" id="bkCat"></select></label>
+    <div class="two">
+      <label class="f">Precio<span class="money"><input class="inp" id="bkPrice" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0 = a consultar"></span></label>
+      <label class="f">Precio en oferta<span class="money"><input class="inp" id="bkDisc" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Opcional"></span></label>
+    </div>
+    <div class="two">
+      <label class="f">Tallas<input class="inp" id="bkSizes" placeholder="Opcional: S, M, L"></label>
+      <label class="f">Colores<input class="inp" id="bkColors" placeholder="Opcional"></label>
+    </div>
+    <label class="sw"><input type="checkbox" id="bkNew" checked><span class="t"></span>Marcar como Nuevo</label>
+    <div class="group hide" id="bkProg">
+      <p class="gt" id="bkProgTxt">Subiendo…</p>
+      <div class="bulk-bar"><i id="bkBar"></i></div>
+      <span class="hint">No cierres esta pantalla hasta que termine.</span>
+    </div>
+  </form>
+  <div class="sh-foot">
+    <button class="btn btn-blue" id="bkSave" type="submit" form="bkForm">Crear productos</button>
   </div>
 </aside>
 
@@ -491,8 +540,85 @@ function openEditor(id){
   setTimeout(()=>$("#pName").focus(),300);
 }
 function closeEditor(){ $("#sheet").classList.remove("on"); $("#scrim").classList.remove("on"); document.body.style.overflow=""; EDIT=null; }
-$("#shClose").onclick=closeEditor; $("#scrim").onclick=closeEditor;
-document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&EDIT) closeEditor(); });
+$("#shClose").onclick=closeEditor; $("#scrim").onclick=()=>{ if(BULK.open) closeBulk(); else closeEditor(); };
+document.addEventListener("keydown",e=>{ if(e.key!=="Escape") return; if(BULK.open) closeBulk(); else if(EDIT) closeEditor(); });
+
+/* ---------- Carga rápida: muchas fotos → muchos productos ---------- */
+const BULK={open:false,files:[],urls:[],running:false};
+function openBulk(){
+  BULK.open=true; BULK.files=[]; BULK.urls.forEach(u=>URL.revokeObjectURL(u)); BULK.urls=[];
+  $("#bkCat").innerHTML=CATS.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join("")+`<option value="">Sin categoría</option>`;
+  const fc=$("#fCat").value; if(fc) $("#bkCat").value=fc;
+  ["#bkName","#bkPrice","#bkDisc","#bkSizes","#bkColors"].forEach(k=>$(k).value="");
+  $("#bkNum").checked=true; $("#bkNew").checked=true; $("#bkProg").classList.add("hide"); $("#bkBar").style.width="0";
+  renderBulk();
+  $("#bulk").classList.add("on"); $("#scrim").classList.add("on"); document.body.style.overflow="hidden"; $("#bulk .sh-body").scrollTop=0;
+}
+function closeBulk(){
+  if(BULK.running) return toast("Espera a que termine de subir",true);
+  BULK.open=false; $("#bulk").classList.remove("on"); $("#scrim").classList.remove("on"); document.body.style.overflow="";
+  BULK.urls.forEach(u=>URL.revokeObjectURL(u)); BULK.urls=[]; BULK.files=[];
+}
+function renderBulk(){
+  const n=BULK.files.length;
+  $("#bkCount").textContent=n?`· ${n} ${n===1?"foto":"fotos"}`:"";
+  $("#bkPhotos").innerHTML=BULK.urls.map((u,i)=>`<div class="ph" data-i="${i}"><img src="${u}" alt=""><span class="n">${i+1}</span>
+    ${BULK.running?"":`<button type="button" class="rm" data-bkrm="${i}" aria-label="Quitar foto">${ic("x",2.2)}</button>`}</div>`).join("")
+    + (BULK.running?"":`<button type="button" class="ph up" id="bkAdd">${ic("plus",2)}${n?"Más fotos":"Elegir fotos"}</button>`);
+  $("#bkSave").textContent=n?`Crear ${n} ${n===1?"producto":"productos"}`:"Crear productos";
+}
+$("#bulkBtn").onclick=openBulk; $("#bkClose").onclick=closeBulk;
+$("#bkPhotos").addEventListener("click",e=>{
+  const t=e.target.closest("button"); if(!t||BULK.running) return;
+  if(t.id==="bkAdd") return $("#bkFile").click();
+  if(t.dataset.bkrm){ const i=+t.dataset.bkrm; URL.revokeObjectURL(BULK.urls[i]); BULK.urls.splice(i,1); BULK.files.splice(i,1); renderBulk(); }
+});
+$("#bkFile").addEventListener("change",e=>{
+  const fs=[...e.target.files].filter(f=>f.type.startsWith("image/")); e.target.value="";
+  fs.forEach(f=>{ BULK.files.push(f); BULK.urls.push(URL.createObjectURL(f)); }); renderBulk();
+});
+const splitList=v=>v.split(",").map(x=>x.trim()).filter(Boolean);
+$("#bkForm").addEventListener("submit",async e=>{
+  e.preventDefault(); if(BULK.running) return;
+  const n=BULK.files.length, base=$("#bkName").value.trim();
+  const price=$("#bkPrice").value===""?0:parseFloat($("#bkPrice").value), disc=$("#bkDisc").value===""?null:parseFloat($("#bkDisc").value);
+  if(!n) return toast("Elige las fotos primero",true);
+  if(!base) return toast("Escribe el nombre",true), $("#bkName").focus();
+  if(!(price>=0)) return toast("Revisa el precio",true);
+  if(disc!==null&&!(disc<price)) return toast("El precio en oferta debe ser menor al precio",true);
+  const numerar=$("#bkNum").checked;
+  // seguir la numeración si ya existen "Gorra 1, Gorra 2…"
+  const esc_=base.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"), rx=new RegExp(`^${esc_} (\\d+)$`,"i");
+  let start=PRODS.reduce((m,p)=>{ const k=(p.name||"").match(rx); return k?Math.max(m,+k[1]):m; },0);
+  let pos=Math.max(0,...PRODS.map(x=>x.position||0));
+  const cat=$("#bkCat").value?+$("#bkCat").value:null, sizes=splitList($("#bkSizes").value), colors=splitList($("#bkColors").value), isNew=$("#bkNew").checked;
+  BULK.running=true; renderBulk(); $("#bkSave").disabled=true; $("#bkProg").classList.remove("hide");
+  $("#bkProg").scrollIntoView({block:"nearest"});
+  const urls=new Array(n).fill(null); let done=0, fails=0;
+  const step=()=>{ $("#bkProgTxt").textContent=`Subiendo fotos: ${done} de ${n}${fails?` · ${fails} con error`:""}`; $("#bkBar").style.width=`${Math.round(done/n*90)}%`; };
+  step();
+  let next=0;
+  async function worker(){ while(next<n){ const i=next++; const cell=document.querySelector(`#bkPhotos .ph[data-i="${i}"]`);
+    try{ const b=await compress(BULK.files[i]); urls[i]=await upload(b,`${Date.now()}-${i}-${Math.random().toString(36).slice(2,7)}.webp`); cell&&cell.classList.add("done"); }
+    catch(err){ fails++; cell&&cell.classList.add("fail"); }
+    done++; step(); } }
+  await Promise.all([worker(),worker(),worker()]);
+  const now=new Date().toISOString();
+  const rows=urls.map((u,i)=>u&&({ store_id:STORE.id, name:numerar?`${base} ${++start}`:base, price, discount_price:disc, category_id:cat,
+    position:++pos, images:[u], image_url:u, sizes:sizes.length?sizes:null, colors:colors.length?colors:null,
+    is_new:isNew, featured:false, sold_out:false, hidden:false, in_stock:true, updated_at:now })).filter(Boolean);
+  $("#bkProgTxt").textContent="Creando productos…";
+  try{
+    for(let i=0;i<rows.length;i+=50) await api("products",{method:"POST",body:rows.slice(i,i+50),prefer:"return=minimal"});
+    $("#bkBar").style.width="100%";
+    BULK.running=false; $("#bkSave").disabled=false; closeBulk(); await loadProds();
+    toast(fails?`${rows.length} productos creados · ${fails} fotos no subieron`:`${rows.length} productos creados`, !!fails);
+  }catch(err){
+    urls.filter(Boolean).forEach(removeFile);
+    BULK.running=false; $("#bkSave").disabled=false; renderBulk(); $("#bkProg").classList.add("hide");
+    toast("No se crearon los productos: "+err.message,true);
+  }
+});
 
 function renderPhotos(){
   $("#photos").innerHTML=EDIT.photos.map((u,i)=>`<div class="ph"><img src="${esc(u)}" alt="">
