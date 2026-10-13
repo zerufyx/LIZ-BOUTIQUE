@@ -365,7 +365,9 @@ async function api(path,{method="GET",body,prefer}={}){
   if(prefer) h.Prefer=prefer;
   const r=await fetch(`${SB_URL}/rest/v1/${path}`,{method,headers:h,body:body?JSON.stringify(body):undefined});
   if(!r.ok){ const j=await r.json().catch(()=>({})); throw new Error(j.message||`Error ${r.status}`); }
-  return r.status===204?null:r.json();
+  // al guardar, el servidor responde vacío: no intentar leerlo (Safari daba "The string did not match the expected pattern")
+  const txt=await r.text(); if(!txt) return null;
+  try{ return JSON.parse(txt); }catch{ return null; }
 }
 async function upload(blob,name){
   const path=`${STORE.id}/${name}`;
@@ -530,8 +532,9 @@ function addChip(k){ if(!EDIT) return; const inp=$("#chipIn-"+k); const v=inp.va
   $("#chips-"+k).addEventListener("click",e=>{ const t=e.target.closest("[data-ch]"); if(t){ EDIT[k].splice(+t.dataset.ch,1); renderChips(k); } else inp.focus(); });
 });
 
+let saving=false;
 $("#pForm").addEventListener("submit",async e=>{
-  e.preventDefault(); addChip("sizes"); addChip("colors");
+  e.preventDefault(); if(saving) return; addChip("sizes"); addChip("colors");
   const name=$("#pName").value.trim(), price=parseFloat($("#pPrice").value), disc=$("#pDisc").value===""?null:parseFloat($("#pDisc").value);
   if(!name) return toast("Escribe el nombre del producto",true), $("#pName").focus();
   if(!(price>=0)) return toast("Escribe el precio",true), $("#pPrice").focus();
@@ -544,14 +547,14 @@ $("#pForm").addEventListener("submit",async e=>{
     images:EDIT.photos, image_url:EDIT.photos[0]||null,
     featured:$("#fFeat").checked, is_new:$("#fNew").checked, sold_out:$("#fSold").checked, hidden:$("#fHidden").checked,
     in_stock:!$("#fSold").checked, updated_at:new Date().toISOString() };
-  $("#pSave").disabled=true; $("#pSave").textContent="Guardando…";
+  saving=true; $("#pSave").disabled=true; $("#pSave").textContent="Guardando…";
   try{
     if(EDIT.id) await api(`products?id=eq.${EDIT.id}`,{method:"PATCH",body});
     else await api("products",{method:"POST",body,prefer:"return=minimal"});
     EDIT.removed.filter(u=>!EDIT.photos.includes(u)).forEach(removeFile);
     const wasNew=!EDIT.id; closeEditor(); await loadProds(); toast(wasNew?"Producto creado":"Cambios guardados");
   }catch(err){ toast(err.message,true); }
-  finally{ $("#pSave").disabled=false; $("#pSave").textContent="Guardar"; }
+  finally{ saving=false; $("#pSave").disabled=false; $("#pSave").textContent="Guardar"; }
 });
 $("#pDelete").onclick=async()=>{
   const p=PRODS.find(x=>x.id===EDIT.id); if(!p||!confirm(`¿Borrar “${p.name}”? No se puede deshacer.`)) return;
