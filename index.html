@@ -573,8 +573,10 @@ function renderGrid(){
     `<div class="empty" style="grid-column:1/-1"><b>${!PRODUCTS.length||sub?'Muy pronto':'Nada por aquí'}</b>
      ${!PRODUCTS.length||sub?'Estamos preparando esta sección. Escríbenos por WhatsApp para ver lo disponible.':'Prueba otra categoría o cambia la búsqueda.'}</div>`;
   const news=PRODUCTS.filter(p=>p.isNew&&!p.out);
-  $('#newSec').hidden=!(news.length&&cat==='all'&&!query);
-  $('#rail').innerHTML=news.map(card).join('');
+  /* "Lo nuevo" desactivado a pedido de Liz (para volver a mostrarlo: SHOW_NEW=true) */
+  const SHOW_NEW=false;
+  $('#newSec').hidden=!(SHOW_NEW&&news.length&&cat==='all'&&!query);
+  $('#rail').innerHTML=$('#newSec').hidden?'':news.map(card).join('');
   railReset();
 }
 /* =========================================================

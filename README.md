@@ -5,7 +5,7 @@ Catálogo de moda (ropa de mujer y hombre, zapatos, bolsos, lentes, gorras y acc
 
 | Archivo | Qué es |
 |---|---|
-| `index.html` | Catálogo: portadas por categoría, banner de lo nuevo, ofertas, carrito y pedido por WhatsApp (con link de cada producto) |
+| `index.html` | Catálogo: portadas por categoría (inicio sin "Colección" ni "Lo nuevo"), ofertas, carrito y pedido por WhatsApp (con link de cada producto) |
 | `admin.html` | Panel de Liz: productos, carga rápida, selección múltiple (mover, agotar, ocultar, borrar), categorías y subcategorías, ajustes |
 | `portadas/` | Portadas iniciales de las 7 categorías (las nuevas que suba Liz van a Supabase) |
 | `prueba/` | Fotos de los productos de prueba. Se borra cuando Liz borre esos productos |
