@@ -562,6 +562,8 @@ function renderGrid(){
   const cname=cat==='all'?'Colección':(CATS.find(c=>c.id===cat)||{}).name||'Colección';
   const C=CATS.find(c=>c.id===cat), subs=C&&C.subs?C.subs:[];
   if(sub&&!subs.some(x=>x.id===sub))sub='';
+  /* en el inicio no se muestra "Colección": se entra por las portadas o la búsqueda */
+  $('#gridSec').hidden=cat==='all'&&!query.trim()&&CATS.length>0;
   $('#gridTitle').textContent=sub?(subs.find(x=>x.id===sub)||{}).name||cname:cname;$('#gridBack').hidden=cat==='all';
   $('#subs').hidden=!subs.length;
   $('#subs').innerHTML=subs.length?[{id:'',name:'Todo'},...subs].map(x=>`<button class="cat" data-sub="${esc(x.id)}" aria-pressed="${sub===x.id}">${esc(x.name)}</button>`).join(''):'';
